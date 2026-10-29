@@ -8,13 +8,10 @@ export const DEFAULT_SETTINGS = {
   language: 'hi-IN',
   voiceRate: 1,
   voiceOn: true,
-  provider: 'gemini',
-  fallbackOrder: ['openai', 'anthropic', 'groq'],
-  // Verify current model names in each provider's documentation before relying on them.
+  provider: 'groq',
+  fallbackOrder: [],
+  // Verify the current model ID in Groq's documentation before relying on it.
   models: {
-    gemini: 'gemini-2.0-flash',
-    openai: 'gpt-4o-mini',
-    anthropic: 'claude-3-5-haiku-latest',
     groq: 'llama-3.3-70b-versatile'
   },
   style: 'short',
@@ -121,5 +118,6 @@ const emptyData = () => ({ notes: [], tasks: [], memories: [], history: [] });
 export const data = {
   get() { return { ...emptyData(), ...read(DATA_KEY, {}) }; },
   set(d) { write(DATA_KEY, d); },
-  clearData() { write(DATA_KEY, emptyData()); }
+  clearData() { write(DATA_KEY, emptyData()
+                     ); }
 };
