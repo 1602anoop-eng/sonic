@@ -9,12 +9,13 @@ export const DEFAULT_SETTINGS = {
   voiceRate: 1,
   voiceOn: true,
   provider: 'gemini',
-  fallbackOrder: ['openai', 'anthropic'],
+  fallbackOrder: ['openai', 'anthropic', 'groq'],
   // Verify current model names in each provider's documentation before relying on them.
   models: {
     gemini: 'gemini-2.0-flash',
     openai: 'gpt-4o-mini',
-    anthropic: 'claude-3-5-haiku-latest'
+    anthropic: 'claude-3-5-haiku-latest',
+    groq: 'llama-3.3-70b-versatile'
   },
   style: 'short',
   retries: 2,

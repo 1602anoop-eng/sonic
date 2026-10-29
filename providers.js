@@ -77,6 +77,16 @@ export const PROVIDERS = {
         { model, max_tokens: 1024, messages: [{ role: 'user', content: prompt }] }, timeoutSec);
       return ensureText(j.content?.filter(b => b.type === 'text').map(b => b.text).join(''));
     }
+  },
+  groq: {
+    name: 'Groq',
+    // Groq uses the OpenAI-compatible chat format.
+    async call(prompt, key, model, timeoutSec) {
+      const j = await post('https://api.groq.com/openai/v1/chat/completions',
+        { Authorization: `Bearer ${key}` },
+        { model, messages: [{ role: 'user', content: prompt }] }, timeoutSec);
+      return ensureText(j.choices?.[0]?.message?.content);
+    }
   }
 };
 
