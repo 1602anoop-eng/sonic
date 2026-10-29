@@ -118,6 +118,5 @@ const emptyData = () => ({ notes: [], tasks: [], memories: [], history: [] });
 export const data = {
   get() { return { ...emptyData(), ...read(DATA_KEY, {}) }; },
   set(d) { write(DATA_KEY, d); },
-  clearData() { write(DATA_KEY, emptyData()
-                     ); }
+  clearData() { write(DATA_KEY, emptyData()); }
 };

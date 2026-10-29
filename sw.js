@@ -1,6 +1,6 @@
 // Bump CACHE_NAME (for example jarvis-v3) whenever you change app files,
 // otherwise phones keep showing the old cached version.
-const CACHE_NAME = 'jarvis-v4';
+const CACHE_NAME = 'jarvis-v5';
 const APP_FILES = [
   './',
   './index.html',
@@ -42,5 +42,4 @@ self.addEventListener('fetch', (event) => {
       cached || fetch(event.request).catch(() => caches.match('./index.html'))
     )
   );
-
 });

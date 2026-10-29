@@ -34,8 +34,11 @@ async function post(url, headers, body, timeoutSec) {
       } catch {
         detail = raw.slice(0, 120);
       }
-      // Hide long tokens so an API key can never appear in the message
-      detail = String(detail).replace(/\S{20,}/g, '[hidden]').slice(0, 160);
+      // Hide only the real API key from the message (model names stay visible for debugging)
+      const secret = (headers.Authorization || '').replace('Bearer ', '');
+      detail = String(detail);
+      if (secret) detail = detail.split(secret).join('[key hidden]');
+      detail = detail.slice(0, 160);
       throw new ProviderError(classify(res.status, raw), `HTTP ${res.status}: ${detail}`);
     }
     try {
@@ -86,6 +89,5 @@ export async function callWithRetry(provider, prompt, key, model, { retries = 2,
       await new Promise(r => setTimeout(r, 500 * 2 ** attempt + Math.random() * 250));
     }
   }
-  throw las
-    tErr;
+  throw lastErr;
 }
