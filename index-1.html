@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0f1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Jarvis</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">JARVIS</div>
+    <div id="status" class="status">Ready</div>
+  </header>
+
+  <canvas id="avatar" class="avatar" aria-label="Jarvis avatar"></canvas>
+
+  <nav class="tabs">
+    <button data-tab="chat" class="active">Chat</button>
+    <button data-tab="tasks">Tasks</button>
+    <button data-tab="notes">Notes</button>
+    <button data-tab="memory">Memory</button>
+    <button data-tab="keys">API Keys</button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+
+  <main>
+    <section id="tab-chat" class="tab active">
+      <div id="log" class="log"></div>
+      <form id="chatForm" class="controls">
+        <button type="button" id="micBtn" title="Bolo">🎤</button>
+        <input id="chatInput" type="text" placeholder="Kuch poochho... (Hindi/English)" autocomplete="off">
+        <button type="submit">Send</button>
+      </form>
+      <div class="row"><button id="stopBtn" class="ghost">Chup karo (Stop)</button></div>
+    </section>
+
+    <section id="tab-tasks" class="tab">
+      <form id="taskForm" class="controls">
+        <input id="taskTitle" type="text" placeholder="Naya task / reminder" required>
+        <input id="taskDue" type="datetime-local">
+        <button type="submit">Add</button>
+      </form>
+      <div id="taskList"></div>
+    </section>
+
+    <section id="tab-notes" class="tab">
+      <form id="noteForm" class="controls">
+        <input id="noteText" type="text" placeholder="Note likho" required>
+        <button type="submit">Save</button>
+      </form>
+      <input id="noteSearch" type="text" placeholder="Notes search karo" class="wide">
+      <div id="noteList"></div>
+    </section>
+
+    <section id="tab-memory" class="tab">
+      <p class="hint">Sirf wahi yaad rahega jo aap khud save karoge. Kabhi bhi delete kar sakte ho.</p>
+      <form id="memForm" class="controls">
+        <input id="memText" type="text" placeholder="Yaad rakhne wali baat" required>
+        <button type="submit">Save</button>
+      </form>
+      <div class="row"><label><input type="checkbox" id="privateToggle"> Private mode (kuch save nahi hoga)</label></div>
+      <div id="memList"></div>
+    </section>
+
+    <section id="tab-keys" class="tab">
+      <p class="hint">Keys sirf is phone ke browser mein store hoti hain. Export ya GitHub mein kabhi nahi jaati. Ye prototype hai: browser mein key rakhne ka risk hai, production ke liye backend use karein.</p>
+      <div id="keyProviders"></div>
+    </section>
+
+    <section id="tab-settings" class="tab">
+      <div id="settingsForm"></div>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
