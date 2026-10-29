@@ -1,4 +1,5 @@
-// AI provider adapters. Each provider exposes call(prompt, key, model, timeoutSec).
+// AI provider adapters. Only Groq is enabled.
+// Each provider exposes call(prompt, key, model, timeoutSec).
 // Keys are passed in per call; they are never logged or shown in error messages.
 
 export class ProviderError extends Error {
@@ -57,37 +58,6 @@ function ensureText(s) {
 }
 
 export const PROVIDERS = {
-  gemini: {
-    name: 'Gemini',
-    async call(prompt, key, model, timeoutSec) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-      const j = await post(url, { 'x-goog-api-key': key },
-        { contents: [{ parts: [{ text: prompt }] }] }, timeoutSec);
-      return ensureText(j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join(''));
-    }
-  },
-  openai: {
-    name: 'OpenAI',
-    async call(prompt, key, model, timeoutSec) {
-      const j = await post('https://api.openai.com/v1/chat/completions',
-        { Authorization: `Bearer ${key}` },
-        { model, messages: [{ role: 'user', content: prompt }] }, timeoutSec);
-      return ensureText(j.choices?.[0]?.message?.content);
-    }
-  },
-  anthropic: {
-    name: 'Anthropic',
-    async call(prompt, key, model, timeoutSec) {
-      const j = await post('https://api.anthropic.com/v1/messages',
-        {
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        { model, max_tokens: 1024, messages: [{ role: 'user', content: prompt }] }, timeoutSec);
-      return ensureText(j.content?.filter(b => b.type === 'text').map(b => b.text).join(''));
-    }
-  },
   groq: {
     name: 'Groq',
     // Groq uses the OpenAI-compatible chat format.
@@ -116,5 +86,6 @@ export async function callWithRetry(provider, prompt, key, model, { retries = 2,
       await new Promise(r => setTimeout(r, 500 * 2 ** attempt + Math.random() * 250));
     }
   }
-  throw lastErr;
+  throw las
+    tErr;
 }
