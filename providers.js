@@ -26,7 +26,17 @@ async function post(url, headers, body, timeoutSec) {
       signal: ctrl.signal
     });
     const raw = await res.text();
-    if (!res.ok) throw new ProviderError(classify(res.status, raw), `HTTP ${res.status}`);
+    if (!res.ok) {
+      let detail = '';
+      try {
+        detail = JSON.parse(raw).error?.message || '';
+      } catch {
+        detail = raw.slice(0, 120);
+      }
+      // Hide long tokens so an API key can never appear in the message
+      detail = String(detail).replace(/\S{20,}/g, '[hidden]').slice(0, 160);
+      throw new ProviderError(classify(res.status, raw), `HTTP ${res.status}: ${detail}`);
+    }
     try {
       return JSON.parse(raw);
     } catch {

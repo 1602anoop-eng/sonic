@@ -351,7 +351,7 @@ function renderKeys() {
               } catch (e) {
                 const kind = e.kind || 'UNKNOWN';
                 keys.patch(id, it.id, { status: kind === 'INVALID_KEY' ? 'invalid' : kind === 'QUOTA' ? 'quota' : 'untested' });
-                setStatus(`${p.name} test fail: ${kind}`);
+                setStatus(`${p.name} test fail: ${e.message}`);
               }
               renderKeys();
             }
