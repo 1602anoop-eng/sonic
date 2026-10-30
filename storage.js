@@ -19,8 +19,16 @@ export const DEFAULT_SETTINGS = {
   timeoutSec: 20,
   offlineOnly: false,
   privateMode: false,
-  avatarTheme: 'cyan',
-  reducedMotion: false
+  volume: 1,
+  continuous: false,
+  expression: 'auto',
+  avatarSize: 100,
+  avatarBg: '#0b0f1a',
+  theme: 'dark',
+  accent: '#00e5ff',
+  reducedMotion: false,
+  confirmDelete: true,
+  queueOffline: true
 };
 
 const read = (k, fallback) => {

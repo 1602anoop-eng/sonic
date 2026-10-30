@@ -1,6 +1,6 @@
 // Voice input (speech recognition) and output (speech synthesis) using browser Web Speech APIs.
 
-export function speak(text, { lang = 'hi-IN', rate = 1, enabled = true, onEnd } = {}) {
+export function speak(text, { lang = 'hi-IN', rate = 1, volume = 1, enabled = true, onEnd, onWord } = {}) {
   if (!enabled || !('speechSynthesis' in window)) {
     onEnd?.();
     return;
@@ -9,6 +9,8 @@ export function speak(text, { lang = 'hi-IN', rate = 1, enabled = true, onEnd } 
   const u = new SpeechSynthesisUtterance(text);
   u.lang = /[\u0900-\u097F]/.test(text) ? 'hi-IN' : lang; // Devanagari text uses Hindi voice
   u.rate = rate;
+  u.volume = Math.min(1, Math.max(0, volume));
+  u.onboundary = (e) => { if (e.name === 'word') onWord?.(); };
   u.onend = () => onEnd?.();
   u.onerror = () => onEnd?.();
   speechSynthesis.speak(u);
@@ -35,6 +37,9 @@ export function createListener({ onStart, onEnd, onResult, onError }) {
     start(lang) {
       rec.lang = lang;
       try { rec.start(); } catch { /* already running */ }
+    },
+    stop() {
+      try { rec.abort(); } catch { /* not running */ }
     }
   };
 }

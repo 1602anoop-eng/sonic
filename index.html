@@ -14,7 +14,10 @@
 <body>
   <header>
     <div class="brand">JARVIS</div>
-    <div id="status" class="status">Ready</div>
+    <div class="hdr-right">
+      <div id="status" class="status">Ready</div>
+      <button id="fsBtn" class="small ghost" title="Avatar full screen">⛶</button>
+    </div>
   </header>
 
   <canvas id="avatar" class="avatar" aria-label="Jarvis avatar"></canvas>
@@ -36,7 +39,7 @@
         <input id="chatInput" type="text" placeholder="Kuch poochho... (Hindi/English)" autocomplete="off">
         <button type="submit">Send</button>
       </form>
-      <div class="row"><button id="stopBtn" class="ghost">Chup karo (Stop)</button></div>
+      <div class="row"><button id="stopBtn" class="danger small">Emergency stop</button></div>
     </section>
 
     <section id="tab-tasks" class="tab">
@@ -58,7 +61,7 @@
     </section>
 
     <section id="tab-memory" class="tab">
-      <p class="hint">Sirf wahi yaad rahega jo aap khud save karoge. Kabhi bhi delete kar sakte ho.</p>
+      <p class="hint">Sirf wahi yaad rahega jo aap khud save karoge. Edit ya delete kar sakte ho.</p>
       <form id="memForm" class="controls">
         <input id="memText" type="text" placeholder="Yaad rakhne wali baat" required>
         <button type="submit">Save</button>
@@ -68,7 +71,7 @@
     </section>
 
     <section id="tab-keys" class="tab">
-      <p class="hint">Keys sirf is phone ke browser mein store hoti hain. Export ya GitHub mein kabhi nahi jaati. Ye prototype hai: browser mein key rakhne ka risk hai, production ke liye backend use karein.</p>
+      <p class="hint">Keys sirf is phone ke browser mein store hoti hain. Export ya GitHub mein kabhi nahi jaati.</p>
       <div id="keyProviders"></div>
     </section>
 

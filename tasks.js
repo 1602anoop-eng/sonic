@@ -1,10 +1,11 @@
 // Task engine.
-// States: pending -> running -> completed | failed | cancelled.
+// States: pending, running, paused, queued (waiting for internet), completed, failed, cancelled.
 // Tasks are saved after every change, so they survive app restarts.
 
 import { data } from './storage.js';
 
-const ACTIVE = ['pending', 'running'];
+const ACTIVE = ['pending', 'running', 'paused', 'queued'];
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
 export const tasks = {
   all() { return data.get().tasks; },
@@ -17,7 +18,7 @@ export const tasks = {
 
   add({ title, due = null, steps = [] }) {
     const list = this.all();
-    // Duplicate prevention: same title while still pending or running.
+    // Duplicate prevention: same title while still active
     const dup = list.find(t => t.title === title && ACTIVE.includes(t.status));
     if (dup) return { duplicate: true, task: dup };
 
@@ -48,11 +49,17 @@ export const tasks = {
     this.patch(id, { status: 'cancelled' });
   },
 
-  // After an app restart, a task that was mid-run goes back to pending so the user can resume it.
+  // Pausing only changes the status. The run loop stops at its next checkpoint.
+  pause(id) {
+    const t = this.all().find(x => x.id === id);
+    if (t && t.status === 'running') this.patch(id, { status: 'paused' });
+  },
+
+  // After an app restart, a task that was running becomes paused, so the user can resume it.
   recoverInterrupted() {
     this._save(this.all().map(t =>
-      t.status === 'running'
-        ? { ...t, status: 'pending', log: [...t.log, 'App band hui thi, resume ke liye pending hai'] }
+      t.status === 'running' || t.status === 'queued'
+        ? { ...t, status: 'paused', log: [...t.log, 'App band hui thi; resume kar sakte hain'] }
         : t
     ));
   },
@@ -64,28 +71,33 @@ export const tasks = {
     );
   },
 
-  // Runs steps in order. A failed step is retried a bounded number of times, then the task fails.
-  // Cancelling mid-run stops the task at the next checkpoint.
+  // Runs unfinished steps in order, starting from the first step that is not completed (so resume works).
+  // A failed step is retried a bounded number of times. Pause or cancel stops the loop at the next checkpoint.
   async run(id, executor, { maxRetries = 2, onChange } = {}) {
     const get = () => this.all().find(t => t.id === id);
-    if (!get() || get().status === 'running') return;
+    const first = get();
+    if (!first || first.status === 'running') return;
+
     this.patch(id, { status: 'running' });
     onChange?.();
 
-    const count = get().steps.length;
-    for (let i = 0; i < count; i++) {
+    const start = first.steps.findIndex(s => s.status !== 'completed');
+    if (start === -1) {
+      this.patch(id, { status: 'completed' });
+      onChange?.();
+      return;
+    }
+
+    for (let i = start; i < first.steps.length; i++) {
       let ok = false;
       let note = '';
       for (let attempt = 0; attempt <= maxRetries && !ok; attempt++) {
-        if (get()?.status !== 'running') return;
-        const label = get().steps[i].label;
-        const r = await executor(label);
-        if (get()?.status !== 'running') return; // cancelled while the step was running
+        if (get()?.status !== 'running') return; // paused, cancelled or removed
+        const r = await executor(first.steps[i].label);
+        if (get()?.status !== 'running') return; // paused or cancelled during the step
         ok = !!r.ok;
         note = r.note || '';
-        if (!ok && attempt < maxRetries) {
-          await new Promise(res => setTimeout(res, 800 * (attempt + 1)));
-        }
+        if (!ok && attempt < maxRetries) await sleep(800 * (attempt + 1));
       }
 
       const task = get();

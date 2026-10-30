@@ -25,7 +25,28 @@ function h(tag, props = {}, ...children) {
   return el;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const confirmDelete = (msg) => !settings.get().confirmDelete || confirm(msg);
+
+// Set by Emergency stop. Blocks continuous listening until the user does something again.
+let halt = false;
+
 const avatar = new Avatar($('#avatar'), settings.get());
+
+// Apply theme, accent colour and avatar look from settings
+function applySettings() {
+  const s = settings.get();
+  document.documentElement.dataset.theme = s.theme;
+  document.documentElement.style.setProperty('--accent', s.accent);
+  $('#avatar').style.height = Math.round(190 * s.avatarSize / 100) + 'px';
+  avatar.update(s);
+  avatar.resize();
+}
+function setSetting(patch) {
+  settings.set(patch);
+  applySettings();
+}
+applySettings();
 
 // ---------- Tabs ----------
 const renderers = {
@@ -54,24 +75,13 @@ function pushHistory(who, text) {
   data.set(d);
 }
 
-function say(text) {
-  const s = settings.get();
-  avatar.setState('speaking');
-  speak(text, {
-    lang: s.language,
-    rate: s.voiceRate,
-    enabled: s.voiceOn,
-    onEnd: () => avatar.setState('idle')
-  });
-}
-
 function addNote(text) {
   const d = data.get();
   d.notes.unshift({ id: crypto.randomUUID(), text, at: Date.now() });
   data.set(d);
 }
 
-// Returns true if saved, false if it was already there.
+// Returns true if saved, false if it already exists.
 function remember(text) {
   const d = data.get();
   if (d.memories.some((m) => m.text.toLowerCase() === text.toLowerCase())) return false;
@@ -91,7 +101,7 @@ function runCommand(text) {
   if (kind === 'task') {
     if (priv) return 'Private mode on hai, task save nahi hoga.';
     const r = tasks.add({ title: body });
-    return r.duplicate ? 'Ye task pehle se pending hai.' : `Task add ho gaya: ${body}`;
+    return r.duplicate ? 'Ye task pehle se active hai.' : `Task add ho gaya: ${body}`;
   }
   if (kind === 'note') {
     if (priv) return 'Private mode on hai, note save nahi hoga.';
@@ -122,14 +132,14 @@ function buildPrompt(userText) {
 async function handleInput(raw) {
   const text = raw.trim();
   if (!text) return;
+  halt = false;
   const s = settings.get();
 
   addMsg(text, 'user');
   if (!s.privateMode) pushHistory('user', text);
 
   if (/\b(stop|chup|band karo)\b/i.test(text)) {
-    stopSpeaking();
-    avatar.setState('idle');
+    emergencyStop();
     return;
   }
 
@@ -137,11 +147,13 @@ async function handleInput(raw) {
   let reply = runCommand(text);
   if (reply === null) reply = localAnswer(text);
   if (reply === null) {
-    const r = await askAI(buildPrompt(text), { onStatus: setStatus });
-    setStatus('Ready');
-    reply = r.ok
-      ? r.text
-      : `Online AI abhi nahi chal raha (${r.reason}). API Keys tab check karein. Basic commands kaam karte hain: time, date, calculation, "task: ...", "note: ...", "yaad rakho: ...".`;
+    if (!navigator.onLine) {
+      reply = 'Abhi internet nahi hai, online AI kaam nahi karega. Aap task banakar baad mein chala sakte hain.';
+    } else {
+      const r = await askAI(buildPrompt(text), { onStatus: setStatus });
+      setStatus('Ready');
+      reply = r.ok ? r.text : `Online AI abhi nahi chal raha (${r.reason}). API Keys tab check karein.`;
+    }
   }
 
   addMsg(reply, 'jarvis');
@@ -149,13 +161,23 @@ async function handleInput(raw) {
   say(reply);
 }
 
-$('#chatForm').onsubmit = (e) => {
-  e.preventDefault();
-  const v = $('#chatInput').value;
-  $('#chatInput').value = '';
-  handleInput(v);
-};
-$('#stopBtn').onclick = () => { stopSpeaking(); avatar.setState('idle'); };
+// ---------- Voice output ----------
+function say(text) {
+  const s = settings.get();
+  avatar.setState('speaking');
+  speak(text, {
+    lang: s.language,
+    rate: s.voiceRate,
+    volume: s.volume,
+    enabled: s.voiceOn,
+    onWord: () => avatar.pulse(),
+    onEnd: () => {
+      avatar.setState('idle');
+      // Continuous conversation: listen again after the reply, unless the user stopped Jarvis
+      if (settings.get().continuous && !halt) listen();
+    }
+  });
+}
 
 // ---------- Voice input ----------
 const listener = createListener({
@@ -167,22 +189,56 @@ const listener = createListener({
   onEnd: () => {
     $('#micBtn').classList.remove('listening');
     if (avatar.state === 'listening') avatar.setState('idle');
-    setStatus('Ready');
+    setStatus(navigator.onLine ? 'Ready' : 'Offline');
   },
   onResult: (t) => handleInput(t),
   onError: (err) => {
+    // In continuous mode, silence is normal. Don't show it as an error.
+    if (err === 'no-speech' && settings.get().continuous) return;
     setStatus('Mic error: ' + err);
     avatar.setState('error');
     setTimeout(() => avatar.setState('idle'), 2000);
   }
 });
-$('#micBtn').onclick = () => {
+
+function listen() {
   if (!listener) {
     setStatus('Is browser mein voice input nahi hai (Chrome use karein)');
     return;
   }
   stopSpeaking();
   listener.start(settings.get().language);
+}
+
+// Emergency stop: silence speech, stop listening, pause running tasks
+function emergencyStop() {
+  halt = true;
+  stopSpeaking();
+  listener?.stop();
+  avatar.setState('idle');
+  for (const t of tasks.all()) {
+    if (t.status === 'running') tasks.pause(t.id);
+  }
+  setStatus('Ruk gaya (emergency stop)');
+  renderTasks();
+}
+
+$('#chatForm').onsubmit = (e) => {
+  e.preventDefault();
+  const v = $('#chatInput').value;
+  $('#chatInput').value = '';
+  handleInput(v);
+};
+$('#stopBtn').onclick = emergencyStop;
+$('#micBtn').onclick = () => { halt = false; listen(); };
+
+// ---------- Full-screen avatar ----------
+$('#fsBtn').onclick = () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    $('#avatar').requestFullscreen?.().catch(() => setStatus('Full screen support nahi hai'));
+  }
 };
 
 // ---------- Tasks ----------
@@ -192,14 +248,25 @@ function renderTasks() {
   const list = tasks.all();
   if (!list.length) box.append(h('p', { class: 'hint' }, 'Koi task nahi hai.'));
   for (const t of list) {
+    const busy = t.status === 'running';
     box.append(h('div', { class: 'card' },
       h('div', { class: 'row' }, h('strong', {}, t.title), h('span', { class: `badge ${t.status}` }, t.status)),
       t.due ? h('small', {}, 'Reminder: ' + new Date(t.due).toLocaleString()) : null,
+      t.steps.length ? h('small', {}, t.steps.map((s) => (s.status === 'completed' ? '✓ ' : '• ') + s.label).join(' | ')) : null,
       t.log.length ? h('small', {}, t.log.slice(-2).join(' | ')) : null,
       h('div', { class: 'row' },
-        h('button', { class: 'small', disabled: t.status === 'running', onclick: () => runTask(t.id) }, 'Run'),
+        busy
+          ? h('button', { class: 'small', onclick: () => { tasks.pause(t.id); renderTasks(); } }, 'Pause')
+          : h('button', {
+              class: 'small',
+              disabled: t.status === 'completed' || t.status === 'cancelled',
+              onclick: () => runTask(t.id)
+            }, t.status === 'paused' ? 'Resume' : 'Run'),
         h('button', { class: 'small ghost', onclick: () => { tasks.cancel(t.id); renderTasks(); } }, 'Cancel'),
-        h('button', { class: 'small ghost', onclick: () => { tasks.remove(t.id); renderTasks(); } }, 'Delete')
+        h('button', {
+          class: 'small ghost',
+          onclick: () => { if (confirmDelete('Ye task delete karein?')) { tasks.remove(t.id); renderTasks(); } }
+        }, 'Delete')
       )
     ));
   }
@@ -207,16 +274,34 @@ function renderTasks() {
 
 async function runTask(id) {
   const t = tasks.all().find((x) => x.id === id);
-  if (!t) return;
+  if (!t || t.status === 'running') return;
+
+  // Offline queue: keep the task until the internet comes back
+  if (!navigator.onLine && settings.get().queueOffline) {
+    tasks.patch(id, { status: 'queued', log: [...t.log, 'Offline: queue mein rakha'] });
+    renderTasks();
+    return;
+  }
+
   if (!t.steps.length) tasks.patch(id, { steps: [{ label: t.title, status: 'pending' }] });
   setStatus('Task chal raha hai...');
   await tasks.run(id, async (label) => {
+    if (halt) return { ok: false, note: 'stopped' };
     const r = await askAI(label, { onStatus: setStatus });
     return r.ok ? { ok: true } : { ok: false, note: r.reason };
   }, { maxRetries: settings.get().retries, onChange: renderTasks });
-  setStatus('Ready');
+  setStatus(navigator.onLine ? 'Ready' : 'Offline');
   renderTasks();
 }
+
+// Runs queued tasks when the connection returns
+async function flushQueue() {
+  for (const t of tasks.all().filter((x) => x.status === 'queued')) {
+    await runTask(t.id);
+  }
+}
+window.addEventListener('online', () => { setStatus('Online'); flushQueue(); });
+window.addEventListener('offline', () => setStatus('Offline: online AI band hai'));
 
 $('#taskForm').onsubmit = (e) => {
   e.preventDefault();
@@ -225,13 +310,13 @@ $('#taskForm').onsubmit = (e) => {
   if (!title) return;
   if (settings.get().privateMode) { setStatus('Private mode on hai, task save nahi hua'); return; }
   const r = tasks.add({ title, due });
-  if (r.duplicate) setStatus('Ye task pehle se pending hai');
+  if (r.duplicate) setStatus('Ye task pehle se active hai');
   $('#taskTitle').value = '';
   $('#taskDue').value = '';
   renderTasks();
 };
 
-// Reminder checker: runs while the app is open. Background reminders need the OS (see README limits).
+// Reminder checker: runs while the app is open
 setInterval(() => {
   for (const t of tasks.dueNow()) {
     tasks.patch(t.id, { notified: true });
@@ -258,6 +343,7 @@ function renderNotes() {
       h('button', {
         class: 'small ghost',
         onclick: () => {
+          if (!confirmDelete('Ye note delete karein?')) return;
           const d = data.get();
           d.notes = d.notes.filter((x) => x.id !== n.id);
           data.set(d);
@@ -280,6 +366,47 @@ $('#noteForm').onsubmit = (e) => {
 $('#noteSearch').oninput = renderNotes;
 
 // ---------- Memory ----------
+function updateMemory(id, text) {
+  const d = data.get();
+  d.memories = d.memories.map((m) => (m.id === id ? { ...m, text } : m));
+  data.set(d);
+  renderMemory();
+}
+
+function removeMemory(id) {
+  const d = data.get();
+  d.memories = d.memories.filter((x) => x.id !== id);
+  data.set(d);
+  renderMemory();
+}
+
+function exportMemory() {
+  const blob = new Blob([JSON.stringify(data.get().memories, null, 2)], { type: 'application/json' });
+  const a = h('a', { href: URL.createObjectURL(blob), download: 'jarvis-memory.json' });
+  document.body.append(a);
+  a.click();
+  a.remove();
+}
+
+async function importMemory(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const list = JSON.parse(await f.text());
+    const d = data.get();
+    for (const m of list) {
+      if (typeof m.text !== 'string' || !m.text.trim()) continue;
+      if (d.memories.some((x) => x.text.toLowerCase() === m.text.trim().toLowerCase())) continue;
+      d.memories.push({ id: crypto.randomUUID(), text: m.text.trim(), at: Date.now() });
+    }
+    data.set(d);
+    renderMemory();
+    setStatus('Memory import ho gayi');
+  } catch {
+    setStatus('Invalid memory file');
+  }
+}
+
 function renderMemory() {
   $('#privateToggle').checked = settings.get().privateMode;
   const box = $('#memList');
@@ -289,17 +416,25 @@ function renderMemory() {
   for (const m of list) {
     box.append(h('div', { class: 'card row' },
       h('span', {}, m.text),
-      h('button', {
-        class: 'small ghost',
-        onclick: () => {
-          const d = data.get();
-          d.memories = d.memories.filter((x) => x.id !== m.id);
-          data.set(d);
-          renderMemory();
-        }
-      }, 'Delete')
+      h('div', { class: 'row' },
+        h('button', {
+          class: 'small ghost',
+          onclick: () => {
+            const v = prompt('Memory update karein:', m.text);
+            if (v && v.trim()) updateMemory(m.id, v.trim());
+          }
+        }, 'Edit'),
+        h('button', {
+          class: 'small ghost',
+          onclick: () => { if (confirmDelete('Ye memory delete karein?')) removeMemory(m.id); }
+        }, 'Delete')
+      )
     ));
   }
+  box.append(h('div', { class: 'row' },
+    h('button', { class: 'small ghost', onclick: exportMemory }, 'Memory export'),
+    h('input', { type: 'file', accept: 'application/json', onchange: importMemory })
+  ));
 }
 
 $('#memForm').onsubmit = (e) => {
@@ -312,7 +447,7 @@ $('#memForm').onsubmit = (e) => {
   renderMemory();
 };
 $('#privateToggle').onchange = (e) => {
-  settings.set({ privateMode: e.target.checked });
+  setSetting({ privateMode: e.target.checked });
   renderMemory();
 };
 
@@ -356,7 +491,10 @@ function renderKeys() {
               renderKeys();
             }
           }, 'Test'),
-          h('button', { class: 'small ghost', onclick: () => { keys.remove(id, it.id); renderKeys(); } }, 'Remove')
+          h('button', {
+            class: 'small ghost',
+            onclick: () => { if (confirmDelete('Ye key remove karein?')) { keys.remove(id, it.id); renderKeys(); } }
+          }, 'Remove')
         )
       )),
       labelInput,
@@ -380,7 +518,7 @@ function renderSettings() {
   const s = settings.get();
   const box = $('#settingsForm');
   box.replaceChildren();
-  const set = (patch) => { settings.set(patch); avatar.update(settings.get()); };
+  const set = (patch) => setSetting(patch);
   const field = (label, el) => h('label', { class: 'field' }, label, el);
   const bool = (label, key) => field(label,
     h('input', { type: 'checkbox', checked: !!s[key], onchange: (e) => set({ [key]: e.target.checked }) }));
@@ -389,16 +527,18 @@ function renderSettings() {
   const choose = (label, key, opts) => field(label,
     h('select', { onchange: (e) => set({ [key]: e.target.value }) },
       ...opts.map(([v, t]) => h('option', { value: v, selected: s[key] === v }, t))));
+  const slider = (label, key, min, max, step, transform = (x) => x) => field(`${label}: ${transform(s[key])}`,
+    h('input', { type: 'range', min, max, step, value: String(s[key]),
+      onchange: (e) => { set({ [key]: Number(e.target.value) }); renderSettings(); } }));
 
   box.append(
     choose('Language', 'language', [['hi-IN', 'Hindi'], ['en-IN', 'English (India)'], ['en-US', 'English (US)']]),
-    field('Voice speed', h('input', {
-      type: 'range', min: 0.5, max: 1.5, step: 0.1, value: String(s.voiceRate),
-      onchange: (e) => { set({ voiceRate: Number(e.target.value) }); renderSettings(); }
-    })),
     bool('Bolkar jawab dein (voice on)', 'voiceOn'),
+    slider('Voice speed', 'voiceRate', 0.5, 1.5, 0.1),
+    slider('Volume', 'volume', 0, 1, 0.1, (x) => Math.round(x * 100) + '%'),
+    bool('Continuous conversation (jawab ke baad apne aap sunna)', 'continuous'),
     choose('Default AI provider', 'provider', Object.keys(PROVIDERS).map((id) => [id, PROVIDERS[id].name])),
-    field('Fallback order (comma se, jaise openai,anthropic)', h('input', {
+    field('Fallback order (comma se, khali chhod sakte hain)', h('input', {
       type: 'text', value: s.fallbackOrder.join(','),
       onchange: (e) => set({ fallbackOrder: e.target.value.split(',').map((x) => x.trim()).filter((x) => PROVIDERS[x]) })
     })),
@@ -409,10 +549,19 @@ function renderSettings() {
     choose('Response style', 'style', [['short', 'Chhota'], ['detailed', 'Detail mein']]),
     num('Retries (0-5)', 'retries', 0, 5),
     num('Timeout seconds (5-60)', 'timeoutSec', 5, 60),
-    choose('Avatar theme', 'avatarTheme', [['cyan', 'Cyan'], ['violet', 'Violet'], ['green', 'Green'], ['amber', 'Amber']]),
+    choose('Theme', 'theme', [['dark', 'Dark'], ['light', 'Light']]),
+    field('Accent colour', h('input', { type: 'color', value: s.accent, onchange: (e) => set({ accent: e.target.value }) })),
+    slider('Avatar size', 'avatarSize', 60, 140, 10, (x) => x + '%'),
+    field('Avatar background', h('input', { type: 'color', value: s.avatarBg, onchange: (e) => set({ avatarBg: e.target.value }) })),
+    choose('Avatar expression', 'expression', [
+      ['auto', 'Auto (state ke hisaab se)'], ['neutral', 'Neutral'], ['happy', 'Happy'],
+      ['confused', 'Confused'], ['focused', 'Focused']
+    ]),
     bool('Reduced animation', 'reducedMotion'),
     bool('Offline mode (online AI band)', 'offlineOnly'),
     bool('Private mode', 'privateMode'),
+    bool('Delete se pehle confirm karein', 'confirmDelete'),
+    bool('Offline hone par tasks queue mein rakhein', 'queueOffline'),
     h('div', { class: 'row' },
       h('button', {
         class: 'small',
@@ -439,7 +588,7 @@ function renderSettings() {
         if (!f) return;
         try {
           settings.importJson(await f.text());
-          avatar.update(settings.get());
+          applySettings();
           renderSettings();
           setStatus('Settings import ho gaye');
         } catch {
@@ -452,13 +601,13 @@ function renderSettings() {
         class: 'small ghost',
         onclick: () => {
           settings.reset();
-          avatar.update(settings.get());
+          applySettings();
           renderSettings();
           setStatus('Settings reset ho gaye');
         }
       }, 'Settings reset'),
       h('button', {
-        class: 'small ghost',
+        class: 'small danger',
         onclick: () => {
           if (confirm('Notes, tasks, memory aur chat history delete ho jayenge. Continue?')) {
             data.clearData();
@@ -473,5 +622,5 @@ function renderSettings() {
 
 // ---------- Startup ----------
 tasks.recoverInterrupted();
-setStatus('Ready');
+setStatus(navigator.onLine ? 'Ready' : 'Offline');
 addMsg('Namaste! Main Jarvis hoon. Mic dabao ya type karo. Example: "task: kal doodh lana", "yaad rakho: mera naam Rahul hai".', 'jarvis');
