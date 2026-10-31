@@ -6,7 +6,7 @@ import { keys, settings } from './storage.js';
 // Local answers for simple requests. Returns null when the online AI should answer.
 export function localAnswer(text) {
   const q = text.toLowerCase().trim();
-  if (/\b(hello|hi|hey|namaste|namaskar)\b/.test(q)) return 'Namaste! Main Jarvis hoon. Kya karna hai?';
+  if (/\b(hello|hi|hey|namaste|namaskar)\b/.test(q)) return 'Namaste boss! Main Jarvis hoon. Kya karna hai?';
   if (/\b(time|samay|kitne baje|waqt)\b/.test(q)) return 'Abhi ka time: ' + new Date().toLocaleTimeString();
   if (/\b(date|tareekh|aaj kya hai)\b/.test(q)) return 'Aaj ki date: ' + new Date().toLocaleDateString();
   if (/^[\d\s.+\-*\/()]+$/.test(q)) {

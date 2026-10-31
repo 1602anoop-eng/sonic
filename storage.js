@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS = {
   accent: '#00e5ff',
   reducedMotion: false,
   confirmDelete: true,
+  addressAs: 'boss',
   queueOffline: true
 };
 
