@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SONIC Avatar</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #msg { position: fixed; left: 0; right: 0; top: 45%; text-align: center;
+         font: 14px sans-serif; color: #aab; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+  "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.1.0/lib/three-vrm.module.min.js"
+} }
+</script>
+</head>
+<body>
+<div id="msg">Loading avatar…</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+
+// ---------- scene ----------
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // battery friendly
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+camera.position.set(0, 1.35, 1.6);
+camera.lookAt(0, 1.3, 0);
+const light = new THREE.DirectionalLight(0xffffff, Math.PI);
+light.position.set(1, 1.5, 2);
+scene.add(light, new THREE.AmbientLight(0xffffff, 0.6));
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+
+// ---------- state ----------
+let vrm = null;
+const S = {
+  state: 'idle',                 // idle | listening | thinking | speaking
+  expression: 'neutral',
+  exprWeight: 0, exprTarget: 0,
+  mouth: { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 },        // current (smoothed)
+  mouthTarget: { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 },  // set by SONIC
+  look: new THREE.Vector2(0, 0), lookTarget: new THREE.Vector2(0, 0),
+  blinkT: 2, blinkPhase: -1,
+  winkT: -1,
+  audioLevel: 0
+};
+
+// Expression presets (VRM 1.0 preset names). Confused/thinking are combos.
+const PRESETS = {
+  neutral:   {},
+  happy:     { happy: 1 },
+  smiling:   { happy: 0.6 },
+  sad:       { sad: 1 },
+  angry:     { angry: 1 },
+  surprised: { surprised: 1 },
+  confused:  { sad: 0.35, surprised: 0.3 },
+  thinking:  { relaxed: 0.4, sad: 0.15 },
+  listening: { relaxed: 0.3 },
+  talking:   {}
+};
+const EXPR_KEYS = ['happy', 'sad', 'angry', 'surprised', 'relaxed'];
+const exprCur = Object.fromEntries(EXPR_KEYS.map(k => [k, 0]));
+
+// ---------- loading ----------
+function loadVRM(url) {
+  const loader = new GLTFLoader();
+  loader.register(p => new VRMLoaderPlugin(p));
+  loader.load(url, gltf => {
+    const m = gltf.userData.vrm;
+    VRMUtils.removeUnnecessaryVertices(gltf.scene);
+    VRMUtils.combineSkeletons(gltf.scene);
+    if (vrm) { scene.remove(vrm.scene); VRMUtils.deepDispose(vrm.scene); }
+    vrm = m;
+    VRMUtils.rotateVRM0(vrm);               // fixes VRM 0.x facing direction
+    vrm.scene.traverse(o => { o.frustumCulled = false; });
+    scene.add(vrm.scene);
+    const h = vrm.humanoid;
+    // relaxed arms (models load in T-pose)
+    h.getNormalizedBoneNode('leftUpperArm').rotation.z = -1.2;
+    h.getNormalizedBoneNode('rightUpperArm').rotation.z = 1.2;
+    vrm.lookAt.target = lookObj;
+    document.getElementById('msg').remove();
+    notify('loaded');
+  }, undefined, err => {
+    document.getElementById('msg').textContent = 'Could not load avatar file';
+    notify('error', String(err));
+  });
+}
+const lookObj = new THREE.Object3D();
+camera.add(lookObj); scene.add(camera);
+lookObj.position.set(0, 0, -1);
+
+// ---------- animation ----------
+const clock = new THREE.Clock();
+const lerp = (a, b, t) => a + (b - a) * t;
+
+function tick() {
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+  if (!vrm) { renderer.render(scene, camera); return; }
+  const em = vrm.expressionManager, h = vrm.humanoid;
+
+  // expression blend
+  const preset = PRESETS[S.expression] || {};
+  for (const k of EXPR_KEYS) {
+    const target = (preset[k] || 0) * S.exprTarget;
+    exprCur[k] = lerp(exprCur[k], target, 1 - Math.exp(-10 * dt));
+    em.setValue(k, exprCur[k]);
+  }
+
+  // blinking (random) + wink
+  S.blinkT -= dt;
+  if (S.blinkT <= 0 && S.blinkPhase < 0) { S.blinkPhase = 0; }
+  let blink = 0;
+  if (S.blinkPhase >= 0) {
+    S.blinkPhase += dt / 0.15;
+    blink = Math.sin(Math.min(S.blinkPhase, 1) * Math.PI);
+    if (S.blinkPhase >= 1) { S.blinkPhase = -1; S.blinkT = 2 + Math.random() * 4; }
+  }
+  if (S.winkT >= 0) {
+    S.winkT += dt / 0.4;
+    const w = Math.sin(Math.min(S.winkT, 1) * Math.PI);
+    em.setValue('blinkRight', w);
+    em.setValue('blinkLeft', 0);
+    if (S.winkT >= 1) S.winkT = -1;
+  } else {
+    em.setValue('blinkRight', 0);
+    em.setValue('blinkLeft', 0);
+  }
+  em.setValue('blink', blink);
+
+  // lip-sync: smooth mouth targets; audio level drives 'aa' when speaking with audio
+  for (const v of Object.keys(S.mouth)) {
+    let target = S.mouthTarget[v];
+    if (v === 'aa' && S.audioLevel > 0) target = Math.max(target, S.audioLevel);
+    S.mouth[v] = lerp(S.mouth[v], target, 1 - Math.exp(-25 * dt));
+    em.setValue(v, S.mouth[v]);
+  }
+
+  // look direction
+  S.look.lerp(S.lookTarget, 1 - Math.exp(-6 * dt));
+  lookObj.position.set(S.look.x, S.look.y, -1);
+
+  // head / body motion by state
+  const head = h.getNormalizedBoneNode('head');
+  const neck = h.getNormalizedBoneNode('neck');
+  const chest = h.getNormalizedBoneNode('chest') || h.getNormalizedBoneNode('spine');
+  const breath = Math.sin(t * 1.6) * 0.012;
+  if (chest) chest.rotation.x = breath;
+
+  let hx = Math.sin(t * 0.7) * 0.02, hy = Math.sin(t * 0.5) * 0.04, hz = 0;
+  switch (S.state) {
+    case 'listening': hz = Math.sin(t * 0.8) * 0.05 + 0.06; hx += 0.03; break;
+    case 'thinking':  hy = -0.18 + Math.sin(t * 0.6) * 0.03; hx -= 0.06; hz = 0.05; break;
+    case 'speaking':  hx += Math.sin(t * 3.1) * 0.02; hy += Math.sin(t * 1.9) * 0.05; break;
+  }
+  head.rotation.set(hx + S.look.y * 0.1, hy - S.look.x * 0.15, hz);
+  if (neck) neck.rotation.set(hx * 0.4, hy * 0.4, hz * 0.4);
+
+  vrm.update(dt);   // applies expressions, lookAt, spring-bone (hair/clothes) physics
+  renderer.render(scene, camera);
+}
+tick();
+
+// ---------- audio lip-sync (works with <audio> or any MediaStream in a PWA) ----------
+let actx, analyser, buf, audioRaf;
+function attachAudio(source) {          // source: HTMLAudioElement or MediaStream
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+  analyser = actx.createAnalyser(); analyser.fftSize = 512;
+  buf = new Uint8Array(analyser.fftSize);
+  const node = source instanceof MediaStream
+    ? actx.createMediaStreamSource(source)
+    : actx.createMediaElementSource(source);
+  node.connect(analyser);
+  if (!(source instanceof MediaStream)) analyser.connect(actx.destination);
+  cancelAnimationFrame(audioRaf);
+  const loop = () => {
+    analyser.getByteTimeDomainData(buf);
+    let sum = 0;
+    for (const b of buf) { const v = (b - 128) / 128; sum += v * v; }
+    const rms = Math.sqrt(sum / buf.length);
+    S.audioLevel = Math.min(1, Math.max(0, (rms - 0.02) * 6));
+    audioRaf = requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+// ---------- public API for SONIC ----------
+function notify(type, data) {
+  const msg = JSON.stringify({ type, data });
+  if (window.Android && window.Android.onAvatarEvent) window.Android.onAvatarEvent(msg); // Kotlin @JavascriptInterface
+  parent !== window && parent.postMessage(msg, '*');
+}
+
+window.sonic = {
+  loadModel: url => loadVRM(url),
+  // 'neutral','happy','smiling','sad','angry','surprised','confused','thinking'
+  setExpression(name, weight = 1) { S.expression = name; S.exprTarget = name === 'neutral' ? 0 : weight; },
+  // 'idle' | 'listening' | 'thinking' | 'speaking'
+  setState(state) {
+    S.state = state;
+    if (state === 'speaking' || state === 'idle') { /* keep current expression */ }
+    if (state === 'listening') this.setExpression('listening', 1);
+    if (state === 'thinking') this.setExpression('thinking', 1);
+    if (state === 'idle') this.setExpression('neutral');
+    if (state !== 'speaking') this.clearMouth();
+  },
+  // one vowel at a time from your TTS/viseme source: 'a','i','u','e','o' (0..1)
+  setViseme(vowel, weight = 1) {
+    const map = { a: 'aa', i: 'ih', u: 'ou', e: 'ee', o: 'oh' };
+    this.clearMouth();
+    if (map[vowel]) S.mouthTarget[map[vowel]] = weight;
+  },
+  // set all five at once: {a:0.8,i:0,u:0,e:0.1,o:0}
+  setVisemes(w) {
+    const map = { a: 'aa', i: 'ih', u: 'ou', e: 'ee', o: 'oh' };
+    for (const k in map) S.mouthTarget[map[k]] = w[k] || 0;
+  },
+  // simple open/close value (0..1) when you only have loudness
+  setMouthOpen(v) { S.audioLevel = Math.max(0, Math.min(1, v)); },
+  clearMouth() { for (const k in S.mouthTarget) S.mouthTarget[k] = 0; S.audioLevel = 0; },
+  // x,y in -1..1 (0,0 = look at user)
+  lookAt(x, y) { S.lookTarget.set(x * 0.5, y * 0.4); },
+  wink() { S.winkT = 0; },
+  attachAudio
+};
+
+// ---------- boot ----------
+const q = new URLSearchParams(location.search);
+loadVRM(q.get('model') || 'SONIC_Female_Avatar.vrm');
+</script>
+</body>
+</html>
