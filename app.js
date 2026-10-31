@@ -5,6 +5,8 @@ import { askAI, localAnswer } from './brain.js';
 import { createListener, speak, stopSpeaking } from './voice.js';
 import { Avatar } from './avatar.js';
 import { parseEmotion, detectEmotion } from './emotion.js';
+import { VrmAvatar } from './vrm-avatar.js';
+import { saveModel, loadModel, deleteModel } from './vrm-store.js';
 
 const $ = (sel) => document.querySelector(sel);
 const setStatus = (t) => { $('#status').textContent = t; };
@@ -33,15 +35,50 @@ const confirmDelete = (msg) => !settings.get().confirmDelete || confirm(msg);
 let halt = false;
 
 const avatar = new Avatar($('#avatar'), settings.get());
+let vrm = null; // created only when the VRM style is used
+
+// Every face call goes to the 2D avatar, and to the VRM model when it is loaded
+const face = {
+  get state() { return avatar.state; },
+  setState(s) { avatar.setState(s); vrm?.setState(s); },
+  setEmotion(e) { avatar.setEmotion(e); vrm?.setEmotion(e); },
+  pulse() { avatar.pulse(); vrm?.pulse(); },
+  update(s) { avatar.update(s); vrm?.update(s); },
+  resize() { avatar.resize(); vrm?.resize(); }
+};
+
+// Loads the saved VRM model. force = true reloads it after a new upload.
+async function ensureVrm(force = false) {
+  if (!force && vrm?.loaded) return;
+  try {
+    const blob = await loadModel();
+    if (!blob) {
+      setStatus('Pehle VRM file upload karein (Settings)');
+      return;
+    }
+    if (!vrm) vrm = new VrmAvatar($('#vrm'));
+    await vrm.load(blob);
+    vrm.setState(avatar.state);
+    setStatus('VRM model load ho gaya');
+  } catch (e) {
+    setStatus('VRM load fail: ' + e.message);
+  }
+}
 
 // Apply theme, accent colour and avatar look from settings
 function applySettings() {
   const s = settings.get();
   document.documentElement.dataset.theme = s.theme;
   document.documentElement.style.setProperty('--accent', s.accent);
-  $('#avatar').style.height = Math.round(190 * s.avatarSize / 100) + 'px';
-  avatar.update(s);
-  avatar.resize();
+  const isVrm = s.avatarStyle === 'vrm';
+  $('#avatar').hidden = isVrm;
+  $('#vrm').hidden = !isVrm;
+  const height = Math.round(190 * s.avatarSize / 100) + 'px';
+  $('#avatar').style.height = height;
+  $('#vrm').style.height = height;
+  face.update(s);
+  face.resize();
+  if (isVrm) ensureVrm();
 }
 function setSetting(patch) {
   settings.set(patch);
@@ -144,7 +181,7 @@ async function handleInput(raw) {
     return;
   }
 
-  avatar.setState('thinking');
+  face.setState('thinking');
   let reply = runCommand(text);
   if (reply === null) reply = localAnswer(text);
   if (reply === null) {
@@ -168,17 +205,17 @@ async function handleInput(raw) {
 // ---------- Voice output ----------
 function say(text, emotion = null) {
   const s = settings.get();
-  avatar.setState('speaking');
-  avatar.setEmotion(emotion);
+  face.setState('speaking');
+  face.setEmotion(emotion);
   speak(text, {
     lang: s.language,
     rate: s.voiceRate,
     volume: s.volume,
     enabled: s.voiceOn,
-    onWord: () => avatar.pulse(),
+    onWord: () => face.pulse(),
     onEnd: () => {
-      avatar.setState('idle');
-      avatar.setEmotion(null);
+      face.setState('idle');
+      face.setEmotion(null);
       // Continuous conversation: listen again after the reply, unless the user stopped Jarvis
       if (settings.get().continuous && !halt) listen();
     }
@@ -188,13 +225,13 @@ function say(text, emotion = null) {
 // ---------- Voice input ----------
 const listener = createListener({
   onStart: () => {
-    avatar.setState('listening');
+    face.setState('listening');
     $('#micBtn').classList.add('listening');
     setStatus('Sun raha hoon...');
   },
   onEnd: () => {
     $('#micBtn').classList.remove('listening');
-    if (avatar.state === 'listening') avatar.setState('idle');
+    if (face.state === 'listening') face.setState('idle');
     setStatus(navigator.onLine ? 'Ready' : 'Offline');
   },
   onResult: (t) => handleInput(t),
@@ -202,8 +239,8 @@ const listener = createListener({
     // In continuous mode, silence is normal. Don't show it as an error.
     if (err === 'no-speech' && settings.get().continuous) return;
     setStatus('Mic error: ' + err);
-    avatar.setState('error');
-    setTimeout(() => avatar.setState('idle'), 2000);
+    face.setState('error');
+    setTimeout(() => face.setState('idle'), 2000);
   }
 });
 
@@ -221,7 +258,7 @@ function emergencyStop() {
   halt = true;
   stopSpeaking();
   listener?.stop();
-  avatar.setState('idle');
+  face.setState('idle');
   for (const t of tasks.all()) {
     if (t.status === 'running') tasks.pause(t.id);
   }
@@ -559,7 +596,31 @@ function renderSettings() {
     field('Accent colour', h('input', { type: 'color', value: s.accent, onchange: (e) => set({ accent: e.target.value }) })),
     slider('Avatar size', 'avatarSize', 60, 140, 10, (x) => x + '%'),
     field('Avatar background', h('input', { type: 'color', value: s.avatarBg, onchange: (e) => set({ avatarBg: e.target.value }) })),
-    choose('Avatar style', 'avatarStyle', [['anime', 'Anime'], ['realistic', 'Realistic']]),
+    choose('Avatar style', 'avatarStyle', [['anime', 'Anime'], ['realistic', 'Realistic'], ['vrm', 'VRM 3D model']]),
+    field('VRM model upload (.vrm file, sirf is phone mein save hogi)', h('input', {
+      type: 'file', accept: '.vrm,.glb',
+      onchange: async (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        try {
+          await saveModel(f);
+          setSetting({ avatarStyle: 'vrm' });
+          await ensureVrm(true);
+          renderSettings();
+        } catch {
+          setStatus('VRM file save nahi hui');
+        }
+      }
+    })),
+    h('button', {
+      class: 'small ghost',
+      onclick: async () => {
+        await deleteModel();
+        setSetting({ avatarStyle: 'anime' });
+        renderSettings();
+        setStatus('VRM model hata diya');
+      }
+    }, 'VRM model hatayein'),
     choose('Avatar expression', 'expression', [
       ['auto', 'Auto (state ke hisaab se)'], ['neutral', 'Neutral'], ['happy', 'Happy'],
       ['excited', 'Excited'], ['sad', 'Sad'], ['angry', 'Angry'], ['surprised', 'Surprised'],

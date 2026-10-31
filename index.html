@@ -9,6 +9,15 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.0.7/lib/three-vrm.module.min.js"
+    }
+  }
+  </script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -21,6 +30,7 @@
   </header>
 
   <canvas id="avatar" class="avatar" aria-label="Jarvis avatar"></canvas>
+  <canvas id="vrm" class="avatar" hidden aria-label="Jarvis 3D avatar"></canvas>
 
   <nav class="tabs">
     <button data-tab="chat" class="active">Chat</button>
