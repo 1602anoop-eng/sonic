@@ -4,6 +4,7 @@ import { tasks } from './tasks.js';
 import { askAI, localAnswer } from './brain.js';
 import { createListener, speak, stopSpeaking } from './voice.js';
 import { Avatar } from './avatar.js';
+import { parseEmotion, detectEmotion } from './emotion.js';
 
 const $ = (sel) => document.querySelector(sel);
 const setStatus = (t) => { $('#status').textContent = t; };
@@ -101,12 +102,12 @@ function runCommand(text) {
   if (kind === 'task') {
     if (priv) return 'Private mode on hai, task save nahi hoga.';
     const r = tasks.add({ title: body });
-    return r.duplicate ? 'Ye task pehle se active hai.' : `Task add ho gaya: ${body}`;
+    return r.duplicate ? 'Ye task pehle se active hai.' : `Ji boss, task add ho gaya: ${body}`;
   }
   if (kind === 'note') {
     if (priv) return 'Private mode on hai, note save nahi hoga.';
     addNote(body);
-    return 'Note save ho gaya.';
+    return 'Ji boss, note save ho gaya.';
   }
   if (priv) return 'Private mode on hai, ye yaad nahi rakhunga.';
   return remember(body) ? `Yaad rakh liya: ${body}` : 'Ye pehle se yaad hai.';
@@ -122,7 +123,7 @@ function buildPrompt(userText) {
     ? 'Jawab chhota aur seedha rakho (2-3 lines).'
     : 'Jawab detail mein do.';
   return [
-    'You are Jarvis, a helpful assistant. Reply in the same language the user uses (Hindi, Hinglish or English). ' + style,
+    `You are Jarvis, a helpful and emotional assistant. Always address the user as "${s.addressAs || 'boss'}". Reply in the same language the user uses (Hindi, Hinglish or English). ${style} Start your reply with exactly one emotion tag: [EMOTION: neutral], [EMOTION: happy], [EMOTION: excited], [EMOTION: sad], [EMOTION: angry], [EMOTION: surprised], [EMOTION: confused] or [EMOTION: thinking]. Pick the tag that matches the feeling of your reply.`,
     mem ? `Known facts the user approved:\n${mem}` : '',
     hist ? `Recent conversation:\n${hist}` : '',
     `User: ${userText}`
@@ -156,15 +157,19 @@ async function handleInput(raw) {
     }
   }
 
+  const parsed = parseEmotion(reply);
+  reply = parsed.text;
+  const emotion = parsed.emotion || detectEmotion(reply);
   addMsg(reply, 'jarvis');
   if (!s.privateMode) pushHistory('jarvis', reply);
-  say(reply);
+  say(reply, emotion);
 }
 
 // ---------- Voice output ----------
-function say(text) {
+function say(text, emotion = null) {
   const s = settings.get();
   avatar.setState('speaking');
+  avatar.setEmotion(emotion);
   speak(text, {
     lang: s.language,
     rate: s.voiceRate,
@@ -173,6 +178,7 @@ function say(text) {
     onWord: () => avatar.pulse(),
     onEnd: () => {
       avatar.setState('idle');
+      avatar.setEmotion(null);
       // Continuous conversation: listen again after the reply, unless the user stopped Jarvis
       if (settings.get().continuous && !halt) listen();
     }
@@ -553,10 +559,16 @@ function renderSettings() {
     field('Accent colour', h('input', { type: 'color', value: s.accent, onchange: (e) => set({ accent: e.target.value }) })),
     slider('Avatar size', 'avatarSize', 60, 140, 10, (x) => x + '%'),
     field('Avatar background', h('input', { type: 'color', value: s.avatarBg, onchange: (e) => set({ avatarBg: e.target.value }) })),
+    choose('Avatar style', 'avatarStyle', [['anime', 'Anime'], ['realistic', 'Realistic']]),
     choose('Avatar expression', 'expression', [
       ['auto', 'Auto (state ke hisaab se)'], ['neutral', 'Neutral'], ['happy', 'Happy'],
-      ['confused', 'Confused'], ['focused', 'Focused']
+      ['excited', 'Excited'], ['sad', 'Sad'], ['angry', 'Angry'], ['surprised', 'Surprised'],
+      ['confused', 'Confused'], ['focused', 'Focused'], ['thinking', 'Thinking']
     ]),
+    field('Jarvis aapko kya bulaye', h('input', {
+      type: 'text', value: s.addressAs,
+      onchange: (e) => set({ addressAs: e.target.value.trim() || 'boss' })
+    })),
     bool('Reduced animation', 'reducedMotion'),
     bool('Offline mode (online AI band)', 'offlineOnly'),
     bool('Private mode', 'privateMode'),
@@ -623,4 +635,4 @@ function renderSettings() {
 // ---------- Startup ----------
 tasks.recoverInterrupted();
 setStatus(navigator.onLine ? 'Ready' : 'Offline');
-addMsg('Namaste! Main Jarvis hoon. Mic dabao ya type karo. Example: "task: kal doodh lana", "yaad rakho: mera naam Rahul hai".', 'jarvis');
+addMsg('Namaste boss! Main Jarvis hoon. Mic dabao ya type karo. Example: "task: kal doodh lana", "yaad rakho: mera naam Rahul hai".', 'jarvis');

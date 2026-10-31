@@ -29,6 +29,7 @@ export const DEFAULT_SETTINGS = {
   reducedMotion: false,
   confirmDelete: true,
   addressAs: 'boss',
+  avatarStyle: 'anime',
   queueOffline: true
 };
 
