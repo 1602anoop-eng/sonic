@@ -1,6 +1,6 @@
 // Bump CACHE_NAME (for example jarvis-v3) whenever you change app files,
 // otherwise phones keep showing the old cached version.
-const CACHE_NAME = 'jarvis-v11';
+const CACHE_NAME = 'jarvis-v13';
 const APP_FILES = [
   './',
   './index.html',
@@ -21,7 +21,11 @@ const APP_FILES = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(APP_FILES)));
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((c) =>
+      Promise.allSettled(APP_FILES.map((f) => c.add(f)))
+    )
+  );
   self.skipWaiting();
 });
 

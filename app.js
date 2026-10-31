@@ -1,7 +1,7 @@
 import { PROVIDERS, callWithRetry } from './providers.js';
 import { settings, keys, data } from './storage.js';
 import { tasks } from './tasks.js';
-import { askAI, localAnswer } from './brain.js';
+import { askAI, askVision, localAnswer } from './brain.js';
 import { createListener, speak, stopSpeaking } from './voice.js';
 import { Avatar } from './avatar.js';
 import { parseEmotion, detectEmotion } from './emotion.js';
@@ -207,6 +207,8 @@ function say(text, emotion = null) {
   const s = settings.get();
   face.setState('speaking');
   face.setEmotion(emotion);
+  // Barge-in needs the mic to run while Jarvis speaks
+  if (settings.get().bargeIn && s.voiceOn && !halt) setTimeout(() => listen(true), 300);
   speak(text, {
     lang: s.language,
     rate: s.voiceRate,
@@ -236,8 +238,15 @@ const listener = createListener({
     if (wasListening) face.setState('idle');
     const s = settings.get();
     // Restart only if we were still waiting for speech (not while thinking or speaking)
-    if (wasListening && (s.continuous || s.wakeWord) && !halt) setTimeout(listen, 400);
+    if (wasListening && (s.continuous || s.wakeWord) && !halt) setTimeout(() => listen(speechSynthesis.speaking), 400);
     setStatus(navigator.onLine ? 'Ready' : 'Offline');
+  },
+  onSpeech: () => {
+    // Barge-in: user started talking while Jarvis is speaking
+    if (settings.get().bargeIn && speechSynthesis.speaking) {
+      stopSpeaking();
+      face.setState('listening');
+    }
   },
   onResult: (t) => {
     let text = t;
@@ -258,12 +267,12 @@ const listener = createListener({
   }
 });
 
-function listen() {
+function listen(keepSpeaking = false) {
   if (!listener) {
     setStatus('Is browser mein voice input nahi hai (Chrome use karein)');
     return;
   }
-  stopSpeaking();
+  if (!keepSpeaking) stopSpeaking();
   listener.start(settings.get().language);
 }
 
@@ -288,6 +297,47 @@ $('#chatForm').onsubmit = (e) => {
 };
 $('#stopBtn').onclick = emergencyStop;
 $('#micBtn').onclick = () => { halt = false; listen(); };
+
+// ---------- Photo and vision ----------
+$('#camBtn').onclick = () => $('#camInput').click();
+$('#camInput').onchange = async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  const question = $('#chatInput').value.trim();
+  $('#chatInput').value = '';
+  addMsg(`📷 Photo bheji${question ? ': ' + question : ''}`, 'user');
+  face.setState('thinking');
+  try {
+    const dataUrl = await imageToDataUrl(f);
+    const r = await askVision(question, dataUrl);
+    const reply = r.ok ? r.text : `Photo analyze nahi ho payi (${r.reason}).`;
+    addMsg(reply, 'jarvis');
+    say(reply, detectEmotion(reply));
+  } catch {
+    addMsg('Photo load nahi hui.', 'jarvis');
+    face.setState('error');
+    setTimeout(() => face.setState('idle'), 2000);
+  }
+};
+
+// Resizes the photo to max 1024px and returns a JPEG data URL (keeps the upload small)
+function imageToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1024 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => reject(new Error('Image load nahi hui'));
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 // ---------- Full-screen avatar ----------
 $('#fsBtn').onclick = () => {
@@ -594,6 +644,22 @@ function renderSettings() {
     slider('Voice speed', 'voiceRate', 0.5, 1.5, 0.1),
     slider('Volume', 'volume', 0, 1, 0.1, (x) => Math.round(x * 100) + '%'),
     bool('Continuous conversation (jawab ke baad apne aap sunna)', 'continuous'),
+    bool('Barge-in: Jarvis bolte waqt aap bolein to wo ruk jaye (headphones best)', 'bargeIn'),
+    field('Vision model (photo analysis ke liye, Groq vision model ID)', h('input', {
+      type: 'text', value: s.visionModel,
+      onchange: (e) => set({ visionModel: e.target.value.trim() })
+    })),
+    h('button', {
+      class: 'small ghost',
+      onclick: async () => {
+        try {
+          const p = await navigator.permissions.query({ name: 'microphone' });
+          setStatus('Mic permission: ' + p.state);
+        } catch {
+          setStatus('Mic permission check support nahi hai');
+        }
+      }
+    }, 'Mic permission check'),
     bool('Wake word: "Hey SONIC" ya "Hey Jarvis" bolne par hi jawab dein', 'wakeWord'),
     choose('Default AI provider', 'provider', Object.keys(PROVIDERS).map((id) => [id, PROVIDERS[id].name])),
     field('Fallback order (comma se, khali chhod sakte hain)', h('input', {

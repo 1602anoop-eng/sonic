@@ -21,7 +21,7 @@ export function stopSpeaking() {
 }
 
 // Returns null if the browser has no speech recognition (e.g. Firefox).
-export function createListener({ onStart, onEnd, onResult, onError }) {
+export function createListener({ onStart, onEnd, onSpeech, onResult, onError }) {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return null;
 
@@ -32,6 +32,7 @@ export function createListener({ onStart, onEnd, onResult, onError }) {
   rec.onend = () => onEnd?.();
   rec.onerror = (e) => onError?.(e.error);
   rec.onresult = (e) => onResult?.(e.results[0][0].transcript);
+  rec.onspeechstart = () => onSpeech?.();
 
   return {
     start(lang) {

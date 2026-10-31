@@ -31,6 +31,8 @@ export const DEFAULT_SETTINGS = {
   addressAs: 'boss',
   avatarStyle: 'anime',
   wakeWord: false,
+  bargeIn: false,
+  visionModel: '',
   queueOffline: true
 };
 

@@ -145,6 +145,19 @@ export class VrmAvatar {
     const bt = t - this.blinkStart;
     em?.setValue('blink', !this.reduced && bt < 0.2 ? Math.sin((Math.PI * bt) / 0.2) : 0);
 
+    // Arms: relax them down from the T-pose. Wave the right hand when happy or excited.
+    // Bone directions are approximate and must be checked with a real VRM model.
+    const hb = this.vrm.humanoid;
+    if (hb) {
+      const lu = hb.getNormalizedBoneNode('leftUpperArm');
+      const ru = hb.getNormalizedBoneNode('rightUpperArm');
+      const rl = hb.getNormalizedBoneNode('rightLowerArm');
+      const waving = !this.reduced && this.state === 'speaking' && (this.emotion === 'happy' || this.emotion === 'excited');
+      if (lu) lu.rotation.z = THREE.MathUtils.lerp(lu.rotation.z, 1.1, 0.05);
+      if (ru) ru.rotation.z = THREE.MathUtils.lerp(ru.rotation.z, -1.1, 0.05);
+      if (rl) rl.rotation.z = waving ? -0.9 + Math.sin(t * 6) * 0.4 : THREE.MathUtils.lerp(rl.rotation.z, 0, 0.05);
+    }
+
     // Gentle sway
     this.pivot.rotation.y = this.reduced ? 0 : Math.sin(t * 0.5) * 0.05;
 

@@ -50,3 +50,33 @@ export async function askAI(prompt, { onStatus } = {}) {
 
   return { ok: false, reason: problems.join(', ') || 'koi active API key nahi hai' };
 }
+
+// Photo analysis: sends a photo and a question to a vision-capable Groq model set in Settings.
+export async function askVision(question, imageDataUrl) {
+  const s = settings.get();
+  if (!s.visionModel) return { ok: false, reason: 'Settings mein Vision model ka naam daalein' };
+  const k = keys.active('groq');
+  if (!k) return { ok: false, reason: 'Groq key active nahi hai' };
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${k.value}` },
+      body: JSON.stringify({
+        model: s.visionModel,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: question || 'Is photo mein kya hai? Hinglish mein, friendly tone mein batao, aur "boss" se bulao.' },
+            { type: 'image_url', image_url: { url: imageDataUrl } }
+          ]
+        }]
+      })
+    });
+    const j = await res.json();
+    if (!res.ok) return { ok: false, reason: `HTTP ${res.status}: ${String(j?.error?.message || '').slice(0, 140)}` };
+    const text = j.choices?.[0]?.message?.content?.trim();
+    return text ? { ok: true, text } : { ok: false, reason: 'Khaali jawab aaya' };
+  } catch {
+    return { ok: false, reason: 'Network error' };
+  }
+}
