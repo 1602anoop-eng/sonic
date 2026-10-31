@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS = {
   confirmDelete: true,
   addressAs: 'boss',
   avatarStyle: 'anime',
+  wakeWord: false,
   queueOffline: true
 };
 

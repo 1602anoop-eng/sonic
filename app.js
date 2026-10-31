@@ -217,7 +217,8 @@ function say(text, emotion = null) {
       face.setState('idle');
       face.setEmotion(null);
       // Continuous conversation: listen again after the reply, unless the user stopped Jarvis
-      if (settings.get().continuous && !halt) listen();
+      const s2 = settings.get();
+      if ((s2.continuous || s2.wakeWord) && !halt) listen();
     }
   });
 }
@@ -231,10 +232,23 @@ const listener = createListener({
   },
   onEnd: () => {
     $('#micBtn').classList.remove('listening');
-    if (face.state === 'listening') face.setState('idle');
+    const wasListening = face.state === 'listening';
+    if (wasListening) face.setState('idle');
+    const s = settings.get();
+    // Restart only if we were still waiting for speech (not while thinking or speaking)
+    if (wasListening && (s.continuous || s.wakeWord) && !halt) setTimeout(listen, 400);
     setStatus(navigator.onLine ? 'Ready' : 'Offline');
   },
-  onResult: (t) => handleInput(t),
+  onResult: (t) => {
+    let text = t;
+    if (settings.get().wakeWord) {
+      const m = t.match(/^\s*(hey|hi|he|ok)\s+(sonic|jarvis|sony)\b[,.!?]?\s*/i);
+      if (!m) return; // not addressed to Jarvis: onEnd restarts listening
+      text = t.slice(m[0].length);
+      if (!text.trim()) { say('Ji boss, bolo.', 'happy'); return; }
+    }
+    handleInput(text);
+  },
   onError: (err) => {
     // In continuous mode, silence is normal. Don't show it as an error.
     if (err === 'no-speech' && settings.get().continuous) return;
@@ -580,6 +594,7 @@ function renderSettings() {
     slider('Voice speed', 'voiceRate', 0.5, 1.5, 0.1),
     slider('Volume', 'volume', 0, 1, 0.1, (x) => Math.round(x * 100) + '%'),
     bool('Continuous conversation (jawab ke baad apne aap sunna)', 'continuous'),
+    bool('Wake word: "Hey SONIC" ya "Hey Jarvis" bolne par hi jawab dein', 'wakeWord'),
     choose('Default AI provider', 'provider', Object.keys(PROVIDERS).map((id) => [id, PROVIDERS[id].name])),
     field('Fallback order (comma se, khali chhod sakte hain)', h('input', {
       type: 'text', value: s.fallbackOrder.join(','),
