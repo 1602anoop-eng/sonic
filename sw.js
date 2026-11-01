@@ -1,6 +1,6 @@
 // Bump CACHE_NAME (for example jarvis-v3) whenever you change app files,
 // otherwise phones keep showing the old cached version.
-const CACHE_NAME = 'jarvis-v13';
+const CACHE_NAME = 'jarvis-v15';
 const APP_FILES = [
   './',
   './index.html',
@@ -15,6 +15,7 @@ const APP_FILES = [
   './emotion.js',
   './vrm-avatar.js',
   './vrm-store.js',
+  './phone.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'

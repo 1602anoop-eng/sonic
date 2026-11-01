@@ -6,6 +6,7 @@ import { createListener, speak, stopSpeaking } from './voice.js';
 import { Avatar } from './avatar.js';
 import { parseEmotion, detectEmotion } from './emotion.js';
 import { VrmAvatar } from './vrm-avatar.js';
+import { phoneCommand } from './phone.js';
 import { saveModel, loadModel, deleteModel } from './vrm-store.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -42,7 +43,7 @@ const face = {
   get state() { return avatar.state; },
   setState(s) { avatar.setState(s); vrm?.setState(s); },
   setEmotion(e) { avatar.setEmotion(e); vrm?.setEmotion(e); },
-  pulse() { avatar.pulse(); vrm?.pulse(); },
+  pulse(w) { avatar.pulse(w); vrm?.pulse(w); },
   update(s) { avatar.update(s); vrm?.update(s); },
   resize() { avatar.resize(); vrm?.resize(); }
 };
@@ -183,6 +184,7 @@ async function handleInput(raw) {
 
   face.setState('thinking');
   let reply = runCommand(text);
+  if (reply === null) reply = phoneCommand(text);
   if (reply === null) reply = localAnswer(text);
   if (reply === null) {
     if (!navigator.onLine) {
@@ -214,7 +216,7 @@ function say(text, emotion = null) {
     rate: s.voiceRate,
     volume: s.volume,
     enabled: s.voiceOn,
-    onWord: () => face.pulse(),
+    onWord: (w) => face.pulse(w),
     onEnd: () => {
       face.setState('idle');
       face.setEmotion(null);
