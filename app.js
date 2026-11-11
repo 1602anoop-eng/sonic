@@ -253,8 +253,11 @@ const listener = createListener({
   onResult: (t) => {
     let text = t;
     if (settings.get().wakeWord) {
-      const m = t.match(/^\s*(hey|hi|he|ok)\s+(sonic|jarvis|sony)\b[,.!?]?\s*/i);
-      if (!m) return; // not addressed to Jarvis: onEnd restarts listening
+      const m = t.match(/^\s*(hey|hi|he|ok|हे|हाय|हेलो)[\s,]+(sonic|sony|sonik|jarvis|सोनिक|सोनिक|सोनी|जार्विस|जार्वि)[\s,.!?।]*/i);
+      if (!m) {
+        setStatus('Wake word bolein: "Hey SONIC"');
+        return; // not addressed to Jarvis: onEnd restarts listening
+      }
       text = t.slice(m[0].length);
       if (!text.trim()) { say('Ji boss, bolo.', 'happy'); return; }
     }
@@ -298,6 +301,26 @@ $('#chatForm').onsubmit = (e) => {
   handleInput(v);
 };
 $('#stopBtn').onclick = emergencyStop;
+
+// Chat screen toggles (same settings as the Settings tab)
+function paintToggles() {
+  const s = settings.get();
+  $('#contBtn').textContent = 'Continuous: ' + (s.continuous ? 'on' : 'off');
+  $('#wakeBtn').textContent = 'Wake word: ' + (s.wakeWord ? 'on' : 'off');
+  $('#contBtn').classList.toggle('listening', s.continuous);
+  $('#wakeBtn').classList.toggle('listening', s.wakeWord);
+}
+$('#contBtn').onclick = () => {
+  setSetting({ continuous: !settings.get().continuous });
+  paintToggles();
+  if (settings.get().continuous) { halt = false; listen(); }
+};
+$('#wakeBtn').onclick = () => {
+  setSetting({ wakeWord: !settings.get().wakeWord });
+  paintToggles();
+  if (settings.get().wakeWord) { halt = false; listen(); }
+};
+paintToggles();
 $('#micBtn').onclick = () => { halt = false; listen(); };
 
 // ---------- Photo and vision ----------
