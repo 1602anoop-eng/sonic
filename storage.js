@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS = {
   addressAs: 'boss',
   avatarStyle: 'anime',
   wakeWord: false,
+  currentPerson: '',
   bargeIn: false,
   visionModel: '',
   queueOffline: true
@@ -126,7 +127,7 @@ export const keys = {
   }
 };
 
-const emptyData = () => ({ notes: [], tasks: [], memories: [], history: [] });
+const emptyData = () => ({ notes: [], tasks: [], memories: [], history: [], people: [] });
 
 export const data = {
   get() { return { ...emptyData(), ...read(DATA_KEY, {}) }; },

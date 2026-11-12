@@ -182,6 +182,31 @@ async function handleInput(raw) {
     return;
   }
 
+  // Study request: "mujhe padhna hai"
+  if (STUDY_RE.test(text)) {
+    await startStudy();
+    return;
+  }
+  // Introduce a child: "main Riya hoon", "mera naam Riya hai"
+  const intro = parseIntro(text);
+  if (intro) {
+    const reply = introduce(intro);
+    addMsg(reply, 'jarvis');
+    say(reply, 'happy');
+    return;
+  }
+  // Teaching: "teach: A se Z", "padhao: 1 se 10 ginti", "sikhao: rang"
+  const teach = text.match(/^(teach|padhao|sikhao)\s*[:\-]?\s*(.+)$/i);
+  if (teach) {
+    await teachLesson(teach[2].trim());
+    return;
+  }
+  // Repeat the last lesson: "phir se", "dobara", "repeat"
+  if (/^(phir se|dobara|repeat)\b/i.test(text) && lastLesson.length) {
+    await playLesson(lastLesson);
+    return;
+  }
+
   face.setState('thinking');
   let reply = runCommand(text);
   if (reply === null) reply = phoneCommand(text);
@@ -202,6 +227,140 @@ async function handleInput(raw) {
   addMsg(reply, 'jarvis');
   if (!s.privateMode) pushHistory('jarvis', reply);
   say(reply, emotion);
+}
+
+// ---------- Students: names and lesson progress ----------
+// Browsers cannot tell speakers apart by voice. Students are remembered by name:
+// a child says "main Riya hoon" once, and later lessons go to Riya until someone else introduces themselves.
+const LESSON_PLAN = [
+  'A se Z (alphabets)',
+  '1 se 10 tak ginti',
+  'rang (colours)',
+  'jaanwar (animals)',
+  'Hindi swar: aa, ee, oo'
+];
+const STUDY_RE = /padhna hai|padhna chahta|padhna chahti|padhna chahiye|पढ़ना है|पढ़ना चाहता|पढ़ना चाहती/i;
+const NOT_NAMES = /padh|khel|chahta|chahti|karn|bolo|sun|thak|bhook|khush|udaas|theek|ghar|naya|busy|free|ready|boss|sonic|jarvis|bimar/i;
+
+function students() { return data.get().people || []; }
+
+function saveStudents(list) {
+  const d = data.get();
+  d.people = list;
+  data.set(d);
+}
+
+function currentStudent() {
+  const name = settings.get().currentPerson;
+  return students().find((p) => p.name === name) || null;
+}
+
+// "main Riya hoon", "mera naam Riya hai" -> "Riya". Returns null for normal sentences.
+function parseIntro(text) {
+  const m = text.match(/^(?:mera naam|main|mai|mein)\s+(.+?)(?:\s+(?:hoon|hu|hai|hain))?[.!?]?$/i);
+  if (!m) return null;
+  const name = m[1].trim();
+  if (!/^\p{L}+(?:\s\p{L}+)?$/u.test(name) || NOT_NAMES.test(name)) return null;
+  return name;
+}
+
+function introduce(name) {
+  const list = students();
+  let p = list.find((x) => x.name.toLowerCase() === name.toLowerCase());
+  let reply;
+  if (p) {
+    reply = `Wapas aaye ${p.name}! Chalo padhte hain. Bolo "mujhe padhna hai".`;
+  } else {
+    p = { id: crypto.randomUUID(), name, progress: 0, createdAt: Date.now() };
+    list.push(p);
+    saveStudents(list);
+    reply = `Namaste ${p.name}! Main aapko yaad rakhunga. Padhna hai to bolo "mujhe padhna hai".`;
+  }
+  setSetting({ currentPerson: p.name });
+  return reply;
+}
+
+// Teaches the next lesson in the plan for the current student (or a general lesson if nobody is set)
+async function startStudy() {
+  const who = currentStudent();
+  const topic = LESSON_PLAN[(who?.progress || 0) % LESSON_PLAN.length];
+  const ok = await teachLesson(topic, who?.name || '');
+  if (ok && who) {
+    const list = students();
+    const p = list.find((x) => x.id === who.id);
+    if (p) {
+      p.progress += 1;
+      saveStudents(list);
+    }
+  }
+}
+
+// ---------- Teaching (nursery lessons) ----------
+let lastLesson = [];
+
+// Speaks one line and resolves when the speech ends (so lines play one after another)
+function speakLine(line, emotion, rate) {
+  return new Promise((resolve) => {
+    const s = settings.get();
+    face.setState('speaking');
+    face.setEmotion(emotion);
+    speak(line, {
+      lang: s.language,
+      rate,
+      volume: s.volume,
+      enabled: s.voiceOn,
+      onWord: (w) => face.pulse(w),
+      onEnd: resolve
+    });
+  });
+}
+
+// Plays a lesson line by line, slower than normal speech, with a short pause between lines
+async function playLesson(lines) {
+  const rate = Math.min(settings.get().voiceRate, 0.85); // slower for little children
+  for (let i = 0; i < lines.length; i++) {
+    if (halt) break; // Emergency stop
+    addMsg(lines[i], 'jarvis');
+    await speakLine(lines[i], i === lines.length - 1 ? 'excited' : 'happy', rate);
+    if (halt) break;
+    await new Promise((r) => setTimeout(r, 900));
+  }
+  face.setState('idle');
+  face.setEmotion(null);
+}
+
+async function teachLesson(topic, childName = '') {
+  addMsg(`📚 Lesson: ${topic}`, 'jarvis');
+  face.setState('thinking');
+  const language = /hindi|हिंदी|varnamala|वर्णमाला/i.test(topic)
+    ? 'Hindi (Devanagari script)'
+    : 'simple Hinglish (Hindi and English words)';
+  const prompt = `You are a warm, patient teacher for nursery children (age 3 to 5). ` +
+    `Teach this topic in very simple words: "${topic}". ` +
+    `Reply in ${language}. Address the child by name "${childName || 'bachche'}" and call the other children "bachchon". ` +
+    `Rules: one short sentence per line, maximum 8 lines. ` +
+    `Include one line where the children repeat the word together. ` +
+    `Use only safe, positive, age-appropriate content. ` +
+    `End with one fun question for the children. ` +
+    `No markdown, no numbering, no bullet points.`;
+  const r = await askAI(prompt, { onStatus: setStatus });
+  if (!r.ok) {
+    const msg = `Lesson abhi nahi ban paya (${r.reason}).`;
+    addMsg(msg, 'jarvis');
+    say(msg, 'sad');
+    return false;
+  }
+  // Keep one sentence per line, and remove only list markers like "1." or "-"
+  const lines = r.text.split('\n')
+    .map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim())
+    .filter(Boolean)
+    .slice(0, 10);
+  lastLesson = lines;
+  setStatus('Lesson chal raha hai...');
+  await playLesson(lines);
+  setStatus(navigator.onLine ? 'Ready' : 'Offline');
+  if ((settings.get().continuous || settings.get().wakeWord) && !halt) listen();
+  return true;
 }
 
 // ---------- Voice output ----------
@@ -253,12 +412,15 @@ const listener = createListener({
   onResult: (t) => {
     let text = t;
     if (settings.get().wakeWord) {
-      const m = t.match(/^\s*(hey|hi|he|ok|हे|हाय|हेलो)[\s,]+(sonic|sony|sonik|jarvis|सोनिक|सोनिक|सोनी|जार्विस|जार्वि)[\s,.!?।]*/i);
-      if (!m) {
-        setStatus('Wake word bolein: "Hey SONIC"');
-        return; // not addressed to Jarvis: onEnd restarts listening
+      // Wake word can be anywhere at the start of the phrase, in English or Hindi spelling.
+      // Recognition runs in hi-IN, so "Sonic" may come back as सोनिक.
+      const w = t.match(/(sonic|sony|sonik|jarvis|सोनिक|सोनी|जार्विस|जार्वि)/i);
+      if (!w) {
+        // Show what the mic heard, so we can see why the wake word did not match
+        setStatus(`Suna: "${t}" (wake word nahi mila)`);
+        return; // onEnd restarts listening in wake-word mode
       }
-      text = t.slice(m[0].length);
+      text = t.slice(w.index + w[0].length).replace(/^[\s,.!?।]+/, '');
       if (!text.trim()) { say('Ji boss, bolo.', 'happy'); return; }
     }
     handleInput(text);
