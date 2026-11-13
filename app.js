@@ -284,7 +284,7 @@ function introduce(name) {
 async function startStudy() {
   const who = currentStudent();
   const topic = LESSON_PLAN[(who?.progress || 0) % LESSON_PLAN.length];
-  const ok = await teachLesson(topic, who?.name || '');
+  const ok = await callAndResponse(topic, who?.name || '');
   if (ok && who) {
     const list = students();
     const p = list.find((x) => x.id === who.id);
@@ -316,17 +316,45 @@ function speakLine(line, emotion, rate) {
 }
 
 // Plays a lesson line by line, slower than normal speech, with a short pause between lines
-async function playLesson(lines) {
+async function playLesson(lines, childName = '') {
   const rate = Math.min(settings.get().voiceRate, 0.85); // slower for little children
   for (let i = 0; i < lines.length; i++) {
     if (halt) break; // Emergency stop
-    addMsg(lines[i], 'jarvis');
-    await speakLine(lines[i], i === lines.length - 1 ? 'excited' : 'happy', rate);
+    const line = lines[i];
+    const last = i === lines.length - 1;
+    if (line.startsWith('SAY:')) {
+      await sayAndCheck(line.slice(4).trim(), childName, rate);
+    } else {
+      addMsg(line, 'jarvis');
+      await speakLine(line, last ? 'excited' : 'happy', rate);
+    }
     if (halt) break;
-    await new Promise((r) => setTimeout(r, 900));
+    await new Promise((r) => setTimeout(r, 700));
   }
   face.setState('idle');
   face.setEmotion(null);
+}
+
+// Jarvis says the word, the child repeats it, and Jarvis checks the answer. 3 tries, then moves on.
+async function sayAndCheck(word, childName, rate) {
+  const who = childName || 'bachche';
+  const praise = ['Shabash ' + who + '!', 'Bahut achha!', 'Wah, bahut badhiya!'];
+  addMsg(`👉 Bolo: ${word}`, 'jarvis');
+  await speakLine(word, 'happy', rate);
+  for (let attempt = 1; attempt <= 3 && !halt; attempt++) {
+    await speakLine(attempt === 1 ? 'Ab aap bolo.' : 'Phir se bolo.', 'thinking', rate);
+    const heard = await listenOnce(8000, /[a-z]/i.test(word) ? 'en-IN' : settings.get().language);
+    if (halt) return;
+    if (heard && isMatch(heard, [word])) {
+      const line = praise[attempt - 1];
+      addMsg(line, 'jarvis');
+      await speakLine(line, 'excited', rate);
+      return;
+    }
+    addMsg(heard ? `Suna: "${heard}"` : 'Kuch sunai nahi diya.', 'jarvis');
+    if (attempt < 3) await speakLine(`Koi baat nahi. ${word}, aise bolo.`, 'sad', rate);
+  }
+  if (!halt) await speakLine('Chalo, agle par chalte hain.', 'happy', rate);
 }
 
 async function teachLesson(topic, childName = '') {
@@ -338,8 +366,8 @@ async function teachLesson(topic, childName = '') {
   const prompt = `You are a warm, patient teacher for nursery children (age 3 to 5). ` +
     `Teach this topic in very simple words: "${topic}". ` +
     `Reply in ${language}. Address the child by name "${childName || 'bachche'}" and call the other children "bachchon". ` +
-    `Rules: one short sentence per line, maximum 8 lines. ` +
-    `Include one line where the children repeat the word together. ` +
+    `Rules: one short sentence per line, maximum 10 lines. ` +
+    `Write 4 to 6 lines starting with "SAY: " followed by only one word, for the children to repeat (example: "SAY: Apple"). Other lines are short normal sentences. ` +
     `Use only safe, positive, age-appropriate content. ` +
     `End with one fun question for the children. ` +
     `No markdown, no numbering, no bullet points.`;
@@ -357,9 +385,119 @@ async function teachLesson(topic, childName = '') {
     .slice(0, 10);
   lastLesson = lines;
   setStatus('Lesson chal raha hai...');
-  await playLesson(lines);
+  await playLesson(lines, childName);
   setStatus(navigator.onLine ? 'Ready' : 'Offline');
   if ((settings.get().continuous || settings.get().wakeWord) && !halt) listen();
+  return true;
+}
+
+// ---------- Call and response (word by word) ----------
+// Jarvis says a word, the child repeats it, Jarvis answers, then the next word.
+const WORD_BANK = {
+  'A se Z (alphabets)': [
+    { word: 'Apple', ok: ['apple', 'एप्पल', 'ape'] },
+    { word: 'Ball', ok: ['ball', 'बॉल', 'bol'] },
+    { word: 'Cat', ok: ['cat', 'कैट', 'ket'] },
+    { word: 'Dog', ok: ['dog', 'डॉग'] }
+  ],
+  '1 se 10 tak ginti': [
+    { word: 'Ek', ok: ['ek', 'एक', '1', 'one'] },
+    { word: 'Do', ok: ['do', 'दो', '2', 'two'] },
+    { word: 'Teen', ok: ['teen', 'तीन', '3', 'three'] },
+    { word: 'Chaar', ok: ['chaar', 'चार', '4', 'four', 'char'] },
+    { word: 'Paanch', ok: ['paanch', 'पांच', 'पाँच', '5', 'five'] }
+  ],
+  'rang (colours)': [
+    { word: 'Lal', ok: ['lal', 'laal', 'लाल', 'red'] },
+    { word: 'Neela', ok: ['neela', 'नीला', 'blue'] },
+    { word: 'Hara', ok: ['hara', 'हरा', 'green'] },
+    { word: 'Peela', ok: ['peela', 'पीला', 'yellow'] }
+  ],
+  'jaanwar (animals)': [
+    { word: 'Billi', ok: ['billi', 'बिल्ली', 'cat'] },
+    { word: 'Kutta', ok: ['kutta', 'कुत्ता', 'dog'] },
+    { word: 'Gaay', ok: ['gaay', 'गाय', 'gai', 'cow'] },
+    { word: 'Sher', ok: ['sher', 'शेर', 'lion'] }
+  ],
+  'Hindi swar: aa, ee, oo': [
+    { word: 'Aa', ok: ['aa', 'आ', 'a'] },
+    { word: 'Ee', ok: ['ee', 'ई', 'i'] },
+    { word: 'Oo', ok: ['oo', 'ऊ', 'u'] }
+  ]
+};
+
+// Keeps only letters, matras and digits, so "Apple!" and "ऐप्पल।" compare cleanly
+const norm = (s) => s.toLowerCase().replace(/[^\p{L}\p{M}\p{N}]/gu, '');
+const isMatch = (heard, ok) => {
+  const h = norm(heard);
+  return ok.some((a) => h.includes(norm(a)));
+};
+
+let turnListener = null;
+
+// Listens for one answer from the child. Resolves with the text heard, or null on silence or error.
+function listenOnce(timeoutMs = 8000, lang = settings.get().language) {
+  return new Promise((resolve) => {
+    let timer;
+    const finish = (v) => {
+      clearTimeout(timer);
+      turnListener = null;
+      resolve(v);
+    };
+    const l = createListener({
+      onStart: () => { face.setState('listening'); setStatus('Aap bolo...'); },
+      onResult: (t) => finish(t),
+      onError: () => finish(null),
+      onEnd: () => finish(null)
+    });
+    if (!l) return finish(null);
+    turnListener = l;
+    timer = setTimeout(() => { turnListener?.stop(); finish(null); }, timeoutMs);
+    l.start(lang);
+  });
+}
+
+async function callAndResponse(topic, childName) {
+  const items = WORD_BANK[topic] || [];
+  if (!items.length) return false;
+  if (!listener) {
+    say('Is browser mein mic support nahi hai. Chrome mein app kholein.', 'sad');
+    return false;
+  }
+  const name = childName || 'bachche';
+  const intro = `Chalo ${name}, aaj hum ${topic} seekhenge. Main bolunga, aap repeat karna.`;
+  addMsg(intro, 'jarvis');
+  await speakLine(intro, 'happy', 0.85);
+
+  for (const it of items) {
+    let done = false;
+    for (let attempt = 1; attempt <= 2 && !done; attempt++) {
+      if (halt) return false;
+      const line = attempt === 1 ? `${it.word}. Bolo, ${it.word}.` : `Phir se bolo: ${it.word}.`;
+      addMsg(line, 'jarvis');
+      await speakLine(line, 'happy', 0.85);
+      if (halt) return false;
+
+      const heard = await listenOnce();
+      if (heard) addMsg(`🎤 ${heard}`, 'user');
+      if (heard && isMatch(heard, it.ok)) {
+        const praise = ['Shabash!', 'Bahut badhiya!', 'Wah, bahut accha!'][Math.floor(Math.random() * 3)];
+        addMsg(praise, 'jarvis');
+        await speakLine(`${praise} ${name}!`, 'excited', 0.85);
+        done = true;
+      } else if (attempt === 2) {
+        const reveal = `Koi baat nahi. Ye hai ${it.word}.`;
+        addMsg(reveal, 'jarvis');
+        await speakLine(reveal, 'sad', 0.85);
+      }
+    }
+    if (halt) return false;
+    await new Promise((r) => setTimeout(r, 600));
+  }
+
+  const end = `Bahut badhiya ${name}! Aaj ke sab words ho gaye.`;
+  addMsg(end, 'jarvis');
+  await speakLine(end, 'excited', 0.85);
   return true;
 }
 
@@ -448,6 +586,7 @@ function emergencyStop() {
   halt = true;
   stopSpeaking();
   listener?.stop();
+  turnListener?.stop();
   face.setState('idle');
   for (const t of tasks.all()) {
     if (t.status === 'running') tasks.pause(t.id);
