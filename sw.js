@@ -1,53 +1,23 @@
-// Bump CACHE_NAME (for example jarvis-v3) whenever you change app files,
-// otherwise phones keep showing the old cached version.
-const CACHE_NAME = 'jarvis-v20';
-const APP_FILES = [
-  './',
-  './index.html',
-  './style.css',
-  './app.js',
-  './providers.js',
-  './brain.js',
-  './storage.js',
-  './tasks.js',
-  './voice.js',
-  './avatar.js',
-  './emotion.js',
-  './vrm-avatar.js',
-  './vrm-store.js',
-  './phone.js',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
-];
+// Network first: always get the latest files when online, fall back to the cached copy when offline.
+// Cross-origin requests (Groq API) are never handled here.
+const CACHE = 'sonic-v1';
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((c) =>
-      Promise.allSettled(APP_FILES.map((f) => c.add(f)))
-    )
-  );
-  self.skipWaiting();
-});
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
-});
-
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  const url = new URL(event.request.url);
-  // Only cache our own files. Cross-origin AI API calls go straight to the network.
-  if (url.origin !== self.location.origin) return;
-
-  event.respondWith(
-    caches.match(event.request).then((cached) =>
-      cached || fetch(event.request).catch(() => caches.match('./index.html'))
-    )
-  );
+self.addEventListener('fetch', (e) => {
+  const url = new URL(e.request.url);
+  if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  e.respondWith((async () => {
+    try {
+      const res = await fetch(e.request);
+      if (res.ok) {
+        const cache = await caches.open(CACHE);
+        cache.put(e.request, res.clone());
+      }
+      return res;
+    } catch {
+      return (await caches.match(e.request)) || Response.error();
+    }
+  })());
 });

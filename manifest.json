@@ -1,7 +1,7 @@
 {
-  "name": "Jarvis",
-  "short_name": "Jarvis",
-  "description": "Jarvis personal AI assistant",
+  "name": "SONIC",
+  "short_name": "SONIC",
+  "description": "SONIC voice-first personal AI assistant",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

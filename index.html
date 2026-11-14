@@ -1,101 +1,1058 @@
 <!DOCTYPE html>
 <html lang="hi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0f1a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Jarvis</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icon-192.png">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-      "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.0.7/lib/three-vrm.module.min.js"
-    }
-  }
-  </script>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f1a">
+<title>SONIC</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{color-scheme:dark;--bg:#0b0f1a;--panel:#111a2e;--line:#1f3b5c;--text:#e6f7ff;--muted:#7d93b3;--accent:#00e5ff;--user:#1d2a44;--danger:#f87171;--avbg:#0b0f1a}
+:root[data-theme="light"]{color-scheme:light;--bg:#f4f7fb;--panel:#fff;--line:#c9d6e6;--text:#0b1a2e;--muted:#5a6f8c;--user:#dce8f6;--avbg:#e9eef7}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{display:flex;flex-direction:column;height:100%;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;gap:8px}
+.brand{color:var(--accent);letter-spacing:3px;font-weight:700}
+#status{font-size:13px;color:var(--muted);text-align:right;max-width:62%;overflow:hidden;text-overflow:ellipsis}
+nav{display:flex;overflow-x:auto;gap:4px;padding:0 8px;border-bottom:1px solid var(--line)}
+nav button{background:none;color:var(--muted);border:0;border-bottom:2px solid transparent;border-radius:0;padding:10px 8px;font-size:14px;white-space:nowrap}
+nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
+main{flex:1;min-height:0;display:flex;flex-direction:column}
+section{display:none;flex:1;min-height:0;flex-direction:column;overflow-y:auto;padding:10px 12px}
+section.active{display:flex}
+#log{flex:1;min-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-bottom:6px}
+.m{max-width:85%;padding:9px 12px;border-radius:14px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}
+.m.u{align-self:flex-end;background:var(--user)}
+.m.j{align-self:flex-start;background:var(--panel);border:1px solid var(--line)}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0}
+input[type=text],input[type=password],input[type=number],input[type=datetime-local],input[type=search],select,textarea{flex:1;min-width:110px;padding:11px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:16px}
+input[type=range]{width:100%}
+input[type=color]{width:60px;height:40px;border:0;background:none;padding:0}
+button{border:0;border-radius:12px;padding:10px 14px;background:var(--accent);color:#0b0f1a;font-weight:600;font-size:15px;cursor:pointer}
+button:disabled{opacity:.4}
+button.g{background:transparent;color:var(--accent);border:1px solid var(--line)}
+button.d{background:var(--danger);color:#0b0f1a}
+button.s{padding:6px 10px;font-size:13px}
+button.on{background:#7c3aed;color:#fff;border-color:#7c3aed}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px;margin:6px 0;display:flex;flex-direction:column;gap:6px}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.hint,small{color:var(--muted);font-size:13px}
+.f{display:flex;flex-direction:column;gap:4px;margin:8px 0;color:var(--muted);font-size:14px}
+.f label.c{display:flex;gap:8px;align-items:center;color:var(--text)}
+.badge{font-size:12px;padding:3px 8px;border-radius:999px;background:var(--user)}
+.badge.done{background:#064e3b;color:#e6fff5}.badge.failed{background:#7f1d1d;color:#fff}.badge.running{background:#4c1d95;color:#fff}.badge.paused,.badge.queued{background:#78350f;color:#fff}.badge.cancelled{background:#3f3f46;color:#fff}
+h3{margin:6px 0}
+</style>
 </head>
 <body>
-  <header>
-    <div class="brand">JARVIS</div>
-    <div class="hdr-right">
-      <div id="status" class="status">Ready</div>
-      <button id="fsBtn" class="small ghost" title="Avatar full screen">⛶</button>
+<header>
+  <div class="brand">SONIC</div>
+  <div class="row" style="flex-wrap:nowrap">
+    <div id="status">Ready</div>
+    <button id="fsBtn" class="g s" title="Full screen">⛶</button>
+  </div>
+</header>
+
+<nav>
+  <button data-t="chat" class="active">Chat</button>
+  <button data-t="tasks">Tasks</button>
+  <button data-t="notes">Notes</button>
+  <button data-t="memory">Memory</button>
+  <button data-t="padhai">Padhai</button>
+  <button data-t="settings">Settings</button>
+</nav>
+
+<main>
+  <!-- CHAT -->
+  <section id="s-chat" class="active">
+    <div id="log"></div>
+    <div class="bar">
+      <button id="mic" class="g" title="Bolo">🎤</button>
+      <button id="cam" class="g" title="Photo">📷</button>
+      <input id="txt" type="text" placeholder="Kuch poochho ya likho..." autocomplete="off">
+      <button id="send">Send</button>
     </div>
-  </header>
+    <div class="bar">
+      <button id="cont" class="g">Continuous: off</button>
+      <button id="wake" class="g">Wake word: off</button>
+      <button id="stop" class="d">Stop</button>
+    </div>
+    <input id="camFile" type="file" accept="image/*" capture="environment" hidden>
+  </section>
 
-  <canvas id="avatar" class="avatar" aria-label="Jarvis avatar"></canvas>
-  <canvas id="vrm" class="avatar" hidden aria-label="Jarvis 3D avatar"></canvas>
+  <!-- TASKS -->
+  <section id="s-tasks">
+    <div class="f">Naya task. Steps ke liye "|" lagayein, jaise: <code>Kal ka plan | Shopping list | Reminder</code>
+      <input id="tTitle" type="text" placeholder="Task ka naam / steps">
+    </div>
+    <div class="row"><input id="tDue" type="datetime-local"><button id="tAdd">Add task</button></div>
+    <div id="tList"></div>
+  </section>
 
-  <nav class="tabs">
-    <button data-tab="chat" class="active">Chat</button>
-    <button data-tab="tasks">Tasks</button>
-    <button data-tab="notes">Notes</button>
-    <button data-tab="memory">Memory</button>
-    <button data-tab="keys">API Keys</button>
-    <button data-tab="settings">Settings</button>
-  </nav>
+  <!-- NOTES -->
+  <section id="s-notes">
+    <div class="row"><input id="nText" type="text" placeholder="Note likho"><button id="nAdd">Save</button></div>
+    <input id="nSearch" type="search" placeholder="Notes search karo">
+    <div class="row"><button id="nExport" class="g s">Notes export</button></div>
+    <div id="nList"></div>
+  </section>
 
-  <main>
-    <section id="tab-chat" class="tab active">
-      <div id="log" class="log"></div>
-      <form id="chatForm" class="controls">
-        <button type="button" id="micBtn" title="Bolo">🎤</button>
-        <button type="button" id="camBtn" title="Photo">📷</button>
-        <input id="camInput" type="file" accept="image/*" capture="environment" hidden>
-        <input id="chatInput" type="text" placeholder="Kuch poochho... (Hindi/English)" autocomplete="off">
-        <button type="submit">Send</button>
-      </form>
-      <div class="row"><button id="stopBtn" class="danger small">Emergency stop</button></div>
-      <div class="row">
-        <button id="contBtn" class="small ghost">Continuous: off</button>
-        <button id="wakeBtn" class="small ghost">Wake word: off</button>
-      </div>
-    </section>
+  <!-- MEMORY -->
+  <section id="s-memory">
+    <p class="hint">Sirf wahi yaad rahega jo aap khud save karein. Chat mein "yaad rakho: ..." bhi likh sakte hain.</p>
+    <div class="row"><input id="mText" type="text" placeholder="Yaad rakhne wali baat"><button id="mAdd">Save</button></div>
+    <label class="f c"><input id="privToggle" type="checkbox"> Private mode (chat, notes, tasks, memory save nahi honge)</label>
+    <div class="row"><button id="mExport" class="g s">Memory export</button><input id="mImport" type="file" accept="application/json"></div>
+    <div id="mList"></div>
+  </section>
 
-    <section id="tab-tasks" class="tab">
-      <form id="taskForm" class="controls">
-        <input id="taskTitle" type="text" placeholder="Naya task / reminder" required>
-        <input id="taskDue" type="datetime-local">
-        <button type="submit">Add</button>
-      </form>
-      <div id="taskList"></div>
-    </section>
+  <!-- PADHAI (teaching) -->
+  <section id="s-padhai">
+    <p class="hint">Bachche ka naam chat mein bolein: "main Riya hoon". Phir "mujhe padhna hai" bolein. Jarvis word bolega, bachcha dohrayega, aur check karke shabashi dega.</p>
+    <div id="pList"></div>
+    <div class="row"><button id="pStart">Padhai shuru karein</button><button id="pAdd" class="g">Naya bachcha add karein</button></div>
+    <div class="f">AI lesson ka topic
+      <div class="row"><input id="pTopic" type="text" placeholder="jaise: 1 se 10 ginti, rang, jaanwar"><button id="pAi">Lesson chalayein</button></div>
+    </div>
+  </section>
 
-    <section id="tab-notes" class="tab">
-      <form id="noteForm" class="controls">
-        <input id="noteText" type="text" placeholder="Note likho" required>
-        <button type="submit">Save</button>
-      </form>
-      <input id="noteSearch" type="text" placeholder="Notes search karo" class="wide">
-      <div id="noteList"></div>
-    </section>
+  <!-- SETTINGS -->
+  <section id="s-settings">
+    <h3>Groq AI keys</h3>
+    <div id="kList"></div>
+    <div class="f">Nayi key
+      <input id="kLabel" type="text" placeholder="label, jaise: main">
+      <input id="kVal" type="password" placeholder="gsk_..." autocomplete="off">
+      <div class="row"><button id="kAdd">Key add karein</button><button id="kTest" class="g">Active key test karein</button></div>
+    </div>
+    <div class="f">Chat model <input id="model" type="text"></div>
+    <div class="f">Vision model (photo ke liye) <input id="vmodel" type="text" placeholder="Groq vision model ID"></div>
 
-    <section id="tab-memory" class="tab">
-      <p class="hint">Sirf wahi yaad rahega jo aap khud save karoge. Edit ya delete kar sakte ho.</p>
-      <form id="memForm" class="controls">
-        <input id="memText" type="text" placeholder="Yaad rakhne wali baat" required>
-        <button type="submit">Save</button>
-      </form>
-      <div class="row"><label><input type="checkbox" id="privateToggle"> Private mode (kuch save nahi hoga)</label></div>
-      <div id="memList"></div>
-    </section>
+    <h3>AI behaviour</h3>
+    <div class="f">Retry count (network aur rate-limit par) <input id="retries" type="number" min="0" max="5"></div>
+    <div class="f">Request timeout (seconds) <input id="timeoutSec" type="number" min="5" max="60"></div>
+    <div class="f">Context: AI ko kitne pichhle messages (1 se 20) <input id="ctxLimit" type="number" min="1" max="20"></div>
+    <div class="f">Jawab ki length
+      <select id="respLen"><option value="short">Short</option><option value="normal">Normal</option><option value="detailed">Detailed</option></select>
+    </div>
+    <label class="f c"><input id="memoryUse" type="checkbox"> Saved memory AI jawab mein use karein</label>
+    <label class="f c"><input id="offlineMode" type="checkbox"> Offline mode (online AI band, local features chalte rahein)</label>
 
-    <section id="tab-keys" class="tab">
-      <p class="hint">Keys sirf is phone ke browser mein store hoti hain. Export ya GitHub mein kabhi nahi jaati.</p>
-      <div id="keyProviders"></div>
-    </section>
+    <h3>Awaaz</h3>
+    <div class="f">Bhasha
+      <select id="lang"><option value="hi-IN">Hindi / Hinglish</option><option value="en-IN">English (India)</option><option value="en-US">English (US)</option></select>
+    </div>
+    <div class="f">Voice (phone par installed)<select id="voice"></select></div>
+    <div class="f">Speed <input id="rate" type="range" min="0.6" max="1.4" step="0.1"></div>
+    <div class="f">Volume <input id="vol" type="range" min="0" max="1" step="0.1"></div>
+    <label class="f c"><input id="bargeIn" type="checkbox"> Barge-in (Jarvis bolte waqt aap bolein to ruk jaye; headphones best)</label>
+    <label class="f c"><input id="contSet" type="checkbox"> Continuous conversation</label>
+    <label class="f c"><input id="wakeSet" type="checkbox"> Wake word ("Hey SONIC" / "Hey Jarvis")</label>
+    <div class="row"><button id="micCheck" class="g s">Mic permission check</button><button id="notifBtn" class="g s">Notifications allow karein</button></div>
 
-    <section id="tab-settings" class="tab">
-      <div id="settingsForm"></div>
-    </section>
-  </main>
+    <h3>Look</h3>
+    <div class="f">Theme <select id="theme"><option value="dark">Dark</option><option value="light">Light</option></select></div>
+    <div class="f">Accent colour <input id="accent" type="color"></div>
 
-  <script type="module" src="app.js"></script>
+    <h3>Kaam aur privacy</h3>
+    <label class="f c"><input id="confirmDel" type="checkbox"> Delete se pehle confirm karein</label>
+    <label class="f c"><input id="queueOff" type="checkbox"> Offline hone par tasks queue mein rakhein</label>
+    <label class="f c"><input id="privSet" type="checkbox"> Private mode</label>
+    <div class="f">Photo ke liye camera permission browser ya Android se milti hai. Phone control ke liye SONIC Android app chahiye.</div>
+
+    <h3>Backup</h3>
+    <div class="row"><button id="chatExport" class="g s">Chat export (text)</button></div>
+    <div class="row"><button id="setExport" class="g s">Settings export</button><input id="setImport" type="file" accept="application/json"></div>
+    <div class="row"><button id="setReset" class="g s">Settings reset</button><button id="dataDel" class="d s">Sara data delete</button></div>
+  </section>
+</main>
+
+<script>
+// ============ STORAGE (everything stays in this phone's browser) ============
+const KEY = 'sonic.v2';
+const DEF = {
+  keys: [], activeKey: 0, model: 'openai/gpt-oss-20b', vmodel: '',
+  lang: 'hi-IN', voice: '', rate: 0.95, vol: 1,
+  cont: false, wake: false, bargeIn: false,
+  accent: '#00e5ff', theme: 'dark',
+  retries: 2, timeoutSec: 20, ctxLimit: 8, respLen: 'normal', memoryUse: true, offlineMode: false,
+  privateMode: false, confirmDelete: true, queueOffline: true,
+  students: {}, current: '', history: [], tasks: [], notes: [], memories: [], lastLesson: []
+};
+const SETTING_KEYS = ['model', 'vmodel', 'lang', 'voice', 'rate', 'vol', 'cont', 'wake', 'bargeIn', 'accent', 'theme', 'privateMode', 'confirmDelete', 'queueOffline', 'retries', 'timeoutSec', 'ctxLimit', 'respLen', 'memoryUse', 'offlineMode'];
+let S = { ...DEF, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
+const save = () => localStorage.setItem(KEY, JSON.stringify(S));
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+const nowIso = () => new Date().toISOString();
+
+// Small element builder. Text is always set with textContent, so nothing is injected as HTML.
+function el(tag, props = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'on') { for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); }
+    else if (k === 'class') e.className = v;
+    else if (['value', 'checked', 'disabled', 'selected', 'hidden', 'title', 'min', 'max', 'step', 'type', 'placeholder'].includes(k)) e[k] = v;
+    else e.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) {
+    if (c == null || c === false) continue;
+    e.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return e;
+}
+function status(t) { $('#status').textContent = t; }
+function add(text, who) {
+  $('#log').append(el('div', { class: 'm ' + (who === 'u' ? 'u' : 'j') }, text));
+  $('#log').scrollTop = $('#log').scrollHeight;
+}
+function confirmDel(msg) { return !S.confirmDelete || confirm(msg); }
+// Private mode: nothing new is written to storage (history, notes, tasks, memory)
+const canStore = () => !S.privateMode;
+function download(name, text) {
+  const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'application/json' })), download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+}
+
+// ============ LOOK (theme and accent) ============
+function applyLook() {
+  document.documentElement.dataset.theme = S.theme;
+  document.documentElement.style.setProperty('--accent', S.accent);
+}
+let mood = 'neutral', speaking = false, thinking = false, listening = false;
+let pulse = 0;
+
+// ============ SPEECH OUT ============
+function voiceFor(text) {
+  const all = ('speechSynthesis' in window) ? speechSynthesis.getVoices() : [];
+  if (S.voice) { const v = all.find((x) => x.name === S.voice); if (v) return v; }
+  const want = /[\u0900-\u097F]/.test(text) ? 'hi' : S.lang.slice(0, 2);
+  return all.find((x) => x.lang.toLowerCase().startsWith(want)) || null;
+}
+function sayWait(text, m = 'neutral') {
+  return new Promise((resolve) => {
+    if (!('speechSynthesis' in window)) { resolve(); return; }
+    speechSynthesis.cancel();
+    speaking = true;
+    mood = m;
+    const u = new SpeechSynthesisUtterance(text);
+    const v = voiceFor(text);
+    if (v) u.voice = v;
+    u.lang = v ? v.lang : (/[\u0900-\u097F]/.test(text) ? 'hi-IN' : S.lang);
+    u.rate = S.rate;
+    u.volume = S.vol;
+    u.onboundary = (e) => {
+      if (e.name === 'word') {
+        pulse = 1;
+      }
+    };
+    const finish = () => { speaking = false; mood = 'neutral'; pulse = 0; resolve(); };
+    u.onend = finish;
+    u.onerror = finish;
+    speechSynthesis.speak(u);
+  });
+}
+const say = (text, m = 'neutral') => sayWait(text, m);
+
+// ============ SPEECH IN ============
+let activeRec = null, busy = false, halt = false, micOn = false, wantListen = false, loopOn = false;
+
+// One sentence from the child or user. Returns {text} or {err}. Retries once on "no-speech".
+function recognizeOnce(lang, ms, retry = true) {
+  return new Promise((resolve) => {
+    const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!R) { resolve({ err: 'unsupported' }); return; }
+    const r = new R();
+    r.lang = lang;
+    r.interimResults = false;
+    r.maxAlternatives = 1;
+    let done = false, timer = null;
+    const fin = (v) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      activeRec = null;
+      listening = false;
+      if (!speaking && !thinking) mood = 'neutral';
+      if (v.err === 'no-speech' && retry) { recognizeOnce(lang, ms, false).then(resolve); return; }
+      resolve(v);
+    };
+    r.onstart = () => { listening = true; mood = 'focused'; status('Sun raha hoon...'); };
+    r.onresult = (e) => fin({ text: e.results[0][0].transcript });
+    r.onerror = (e) => fin({ err: e.error });
+    r.onend = () => fin({ text: null });
+    // Barge-in: when the user starts talking while Jarvis speaks, Jarvis stops
+    if (S.bargeIn) r.onspeechstart = () => { if (speaking) speechSynthesis.cancel(); };
+    timer = setTimeout(() => { try { r.abort(); } catch { /* not running */ } fin({ text: null }); }, ms);
+    activeRec = r;
+    try { r.start(); } catch { fin({ err: 'start' }); }
+  });
+}
+
+// Keeps listening while the mic is on, or while continuous / wake word is on
+async function loop() {
+  if (loopOn) return;
+  loopOn = true;
+  while (wantListen) {
+    if (busy || speaking) { await sleep(250); continue; }
+    const r = await recognizeOnce(S.lang, 9000);
+    if (r.err === 'not-allowed' || r.err === 'service-not-allowed') {
+      status('Mic permission nahi mili. Chrome mein mic Allow karein.');
+      micOn = false; S.cont = false; S.wake = false; save(); paintToggles();
+      wantListen = false;
+      break;
+    }
+    if (r.err === 'unsupported') { status('Ye browser voice support nahi karta. Chrome use karein.'); wantListen = false; break; }
+    if (r.err && r.err !== 'aborted' && r.err !== 'no-speech') status('Mic error: ' + r.err);
+    if (r.text) { status('Suna: ' + r.text); await handleVoice(r.text); }
+    else await sleep(150);
+  }
+  loopOn = false;
+}
+function refreshListen() {
+  wantListen = micOn || S.cont || S.wake;
+  if (wantListen) loop();
+}
+const WAKE_RE = /(sonic|sonic|sony|sonik|jarvis|स्पनिक|सोनिक|सोनी|जार्विस)/i;
+async function handleVoice(text) {
+  if (S.wake) {
+    const m = text.match(WAKE_RE);
+    if (!m) { status('Wake word bolein: "Hey SONIC"'); return; }
+    text = text.slice(m.index + m[0].length).replace(/^[\s,.!?।]+/, '');
+    if (!text.trim()) { busy = true; try { await say('Ji boss, bolo.', 'happy'); } finally { busy = false; } return; }
+  }
+  await handleText(text);
+}
+
+// ============ ROUTER: every message goes through here ============
+async function handleText(raw) {
+  const t = raw.trim();
+  if (!t) return;
+  halt = false;
+  busy = true;
+  add(t, 'u');
+  if (canStore()) { S.history.push({ role: 'user', content: t }); S.history = S.history.slice(-30); save(); }
+  try {
+    if (/^(stop|chup|band karo|ruko)\b/i.test(t)) { stopAll(); return; }
+    if (STUDY_RE.test(t)) { await startStudy(); return; }
+    const intro = parseIntro(t);
+    if (intro) { const r = introduce(intro); add(r, 'j'); await say(r, 'happy'); return; }
+    const tm = t.match(/^(teach|padhao|sikhao)\s*[:\-]?\s*(.+)$/i);
+    if (tm) { await teachLesson(tm[2].trim()); return; }
+    if (/^(phir se|dobara|repeat)\b/i.test(t) && S.lastLesson.length) { await playLesson(S.lastLesson, cur()); return; }
+    const mem = t.match(/^(yaad rakho|remember)\s*[:\-]\s*(.+)$/i);
+    if (mem) {
+      if (!canStore()) { await reply('Private mode on hai, ye yaad nahi rakhunga.'); return; }
+      if (S.memories.some((m) => m.text.toLowerCase() === mem[2].trim().toLowerCase())) { await reply('Ye pehle se yaad hai.'); return; }
+      S.memories.unshift({ id: uid(), text: mem[2].trim(), at: nowIso() }); save(); renderMemory();
+      await reply('Yaad rakh liya: ' + mem[2].trim()); return;
+    }
+    const nt = t.match(/^(note|notes)\s*[:\-]\s*(.+)$/i);
+    if (nt) {
+      if (!canStore()) { await reply('Private mode on hai, note save nahi hoga.'); return; }
+      S.notes.unshift({ id: uid(), text: nt[2].trim(), at: nowIso() }); save(); renderNotes();
+      await reply('Note save ho gaya, boss.'); return;
+    }
+    const tk = t.match(/^task\s*[:\-]\s*(.+)$/i);
+    if (tk) {
+      if (!canStore()) { await reply('Private mode on hai, task save nahi hoga.'); return; }
+      addTask(tk[1]); await reply('Task add ho gaya, boss.'); return;
+    }
+    const calcSrc = t.replace(/^(calc|hisaab)\s*[:\-]?\s*/i, '').trim();
+    const looksLikeMath = /^[\d\s.+\-*/()^%×÷]+$/.test(calcSrc) || /^sqrt\(/.test(calcSrc);
+    if (looksLikeMath && /\d/.test(calcSrc) && (/^(calc|hisaab)/i.test(t) || /[+\-*/^%×÷]|sqrt\(/.test(calcSrc))) {
+      try {
+        const v = safeCalc(calcSrc);
+        await reply(calcSrc + ' = ' + Number(v.toFixed(6)));
+      } catch { await reply('Ye calculation samajh nahi aayi. Example: "calc: (12 + 8) * 3" ya "sqrt(144)".'); }
+      return;
+    }
+    const phone = phoneCommand(t);
+    if (phone !== null) { await reply(phone); return; }
+    if (/\b(time|samay|kitne baje)\b/i.test(t)) { await reply('Abhi ka time: ' + new Date().toLocaleTimeString()); return; }
+    if (/\b(date|tareekh|aaj kya hai)\b/i.test(t)) { await reply('Aaj ki date: ' + new Date().toLocaleDateString()); return; }
+    await aiReply(t);
+  } finally {
+    busy = false;
+  }
+}
+async function reply(text) { add(text, 'j'); await say(text, 'neutral'); }
+
+function stopAll() {
+  halt = true;
+  try { activeRec && activeRec.abort(); } catch { /* not running */ }
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  speaking = false; thinking = false; mood = 'neutral';
+  for (const t of S.tasks) if (t.status === 'running') t.status = 'paused';
+  save(); renderTasks();
+  status('Ruk gaya');
+  add('Theek hai boss, ruk gaya.', 'j');
+}
+
+// ============ PHONE CONTROL (only inside the SONIC Android app) ============
+const APPS = { whatsapp: 'com.whatsapp', youtube: 'com.google.android.youtube', chrome: 'com.android.chrome',
+  maps: 'com.google.android.apps.maps', gmail: 'com.google.android.gm', instagram: 'com.instagram.android' };
+function nativeCall(action) {
+  try { return JSON.parse(window.JarvisNative.run(JSON.stringify(action))); }
+  catch { return { ok: false, message: 'Phone control kaam nahi kar raha' }; }
+}
+// Returns the reply text for a phone command, or null if the text is not a phone command.
+function phoneCommand(text) {
+  const q = text.toLowerCase();
+  const isPhone = /\b(flashlight|torch|volume|alarm|timer|battery|navigate|rasta)\b|\bcamera\s*(kholo|open)\b|\b(dial|call)\s+\d|\b(open|kholo)\s+(whatsapp|youtube|chrome|maps|gmail|instagram)\b|\bsettings\s+(wifi|bluetooth|display|sound|battery|apps)\b|\bmaps?\s+\w/i.test(q);
+  if (!isPhone) return null;
+  if (!window.JarvisNative) return 'Ye phone control sirf SONIC Android app mein chalta hai, browser mein nahi.';
+  let m;
+  if (/\b(flashlight|torch)\b/.test(q)) return nativeCall({ action: 'flashlight', on: !/\b(off|band)\b/.test(q) }).message;
+  if ((m = q.match(/volume\s*(\d{1,3})|(\d{1,3})\s*%?\s*volume/))) return nativeCall({ action: 'volume', level: Number(m[1] || m[2]) }).message;
+  if ((m = q.match(/alarm\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm|baje)?/))) {
+    let h = Number(m[1]);
+    if (m[3] === 'pm' && h < 12) h += 12;
+    if (m[3] === 'am' && h === 12) h = 0;
+    return nativeCall({ action: 'alarm', hour: h, minute: Number(m[2] || 0), label: 'SONIC' }).message;
+  }
+  if ((m = q.match(/timer\s*(\d+)\s*(second|sec|minute|min|hour|ghanta)/))) {
+    const unit = /hour|ghanta/.test(m[2]) ? 3600 : /min/.test(m[2]) ? 60 : 1;
+    return nativeCall({ action: 'timer', seconds: Number(m[1]) * unit, label: 'SONIC' }).message;
+  }
+  if ((m = q.match(/(?:open|kholo)\s+(\w+)/)) && APPS[m[1]]) return nativeCall({ action: 'openApp', pkg: APPS[m[1]] }).message;
+  if ((m = q.match(/settings\s+(wifi|bluetooth|display|sound|battery|apps)/))) return nativeCall({ action: 'openSettings', page: m[1] }).message;
+  if (/\bcamera\s*(kholo|open)\b/.test(q)) return nativeCall({ action: 'camera' }).message;
+  if ((m = q.match(/(?:map|maps|navigate|rasta)\s+(.+)/))) return nativeCall({ action: 'map', query: m[1] }).message;
+  if ((m = q.match(/(?:call|dial)\s+(\+?\d{6,15})/))) return nativeCall({ action: 'dial', number: m[1] }).message;
+  if (/\bbattery\b/.test(q)) return nativeCall({ action: 'battery' }).message;
+  return null;
+}
+
+// ============ AI (Groq) ============
+function activeKey() {
+  const cur = S.keys[S.activeKey];
+  if (cur && cur.enabled !== false) return cur;
+  return S.keys.find((k) => k.enabled !== false) || null;
+}
+async function groq(model, messages) {
+  const k = activeKey();
+  if (!k) return { ok: false, reason: 'API key nahi hai ya sab keys disable hain' };
+  let last = { ok: false, reason: 'unknown' };
+  for (let attempt = 0; attempt <= S.retries; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), S.timeoutSec * 1000);
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + k.value },
+        body: JSON.stringify({ model, messages }),
+        signal: ctrl.signal
+      });
+      clearTimeout(timer);
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const text = j.choices?.[0]?.message?.content?.trim();
+        return text ? { ok: true, text } : { ok: false, reason: 'khaali jawab' };
+      }
+      last = { ok: false, reason: 'HTTP ' + res.status + ' ' + String(j?.error?.message || '').slice(0, 120) };
+      if (res.status === 401 || res.status === 403) { k.status = 'invalid key'; save(); return last; }
+      if (res.status !== 429 && res.status < 500) return last;
+    } catch (e) {
+      clearTimeout(timer);
+      last = { ok: false, reason: e.name === 'AbortError' ? 'timeout (' + S.timeoutSec + 's)' : 'internet nahi hai ya network error' };
+    }
+    if (attempt < S.retries) await sleep(800 * 2 ** attempt);
+  }
+  return last;
+}
+
+// Keyword memory retrieval: only memories that share words with the question are sent to the AI
+const norm2 = (s) => s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ');
+const STOPWORDS = new Set(['the', 'a', 'an', 'is', 'are', 'me', 'my', 'mein', 'mera', 'meri', 'mere', 'hai', 'hain', 'ka', 'ki', 'ke', 'kya', 'kaise', 'ko', 'se', 'aur', 'ho', 'to', 'hi', 'ye', 'wo', 'please', 'boss']);
+function relevantMemories(text) {
+  const words = norm2(text).split(/\s+/).filter((w) => w.length > 1 && !STOPWORDS.has(w));
+  if (!words.length) return [];
+  return S.memories
+    .map((m) => ({ m, score: words.filter((w) => norm2(m.text).split(/\s+/).includes(w)).length }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map((x) => x.m);
+}
+
+// Safe calculator: a small parser for + - * / % ^ parentheses and sqrt(). It never runs JavaScript from the user.
+function safeCalc(src) {
+  const s = src.replace(/\s+/g, '').replace(/×/g, '*').replace(/÷/g, '/');
+  let i = 0;
+  const peek = () => s[i];
+  const need = (c) => { if (s[i] !== c) throw new Error('expected ' + c); i++; };
+  function num() {
+    const m = s.slice(i).match(/^\d+(\.\d+)?/);
+    if (!m) throw new Error('number');
+    i += m[0].length;
+    return parseFloat(m[0]);
+  }
+  function atom() {
+    if (s.startsWith('sqrt(', i)) { i += 5; const v = expr(); need(')'); return Math.sqrt(v); }
+    if (peek() === '(') { i++; const v = expr(); need(')'); return v; }
+    if (peek() === '-') { i++; return -atom(); }
+    return num();
+  }
+  function power() { const b = atom(); if (peek() === '^') { i++; return Math.pow(b, power()); } return b; }
+  function term() {
+    let v = power();
+    while (peek() === '*' || peek() === '/' || peek() === '%') {
+      const op = s[i++]; const r = power();
+      v = op === '*' ? v * r : op === '/' ? v / r : v % r;
+    }
+    return v;
+  }
+  function expr() {
+    let v = term();
+    while (peek() === '+' || peek() === '-') { const op = s[i++]; const r = term(); v = op === '+' ? v + r : v - r; }
+    return v;
+  }
+  const v = expr();
+  if (i !== s.length) throw new Error('extra input');
+  if (!isFinite(v)) throw new Error('not finite');
+  return v;
+}
+
+async function aiReply(text) {
+  if (S.offlineMode) { await reply('Offline mode on hai, boss. Online AI band hai. Calculator, notes aur tasks chalte hain.'); return; }
+  if (!navigator.onLine) { await reply('Abhi internet nahi hai, online AI kaam nahi karega. Task banayein to net aane par chalega.'); return; }
+  if (!activeKey()) { await reply('Pehle Settings mein Groq API key daalein (aur kam se kam ek key enable rakhein), boss.'); return; }
+  status('Soch raha hoon...');
+  thinking = true; mood = 'thinking';
+  const len = { short: 'Keep the reply very short (1 to 2 sentences).', normal: 'Keep the reply short (2 to 4 sentences).', detailed: 'Give a detailed, well-structured reply.' }[S.respLen] || '';
+  const mems = S.memoryUse ? relevantMemories(text) : [];
+  const memNote = mems.length ? ' Known facts about the user (use only if relevant): ' + mems.map((m) => m.text).join('; ') + '.' : '';
+  const sys = 'You are SONIC, a friendly, intelligent assistant. Always address the user as "boss". ' +
+    'Reply in the same language the user uses (Hindi, Hinglish or English). ' + len + ' ' +
+    'Start the reply with one emotion word in square brackets from: [happy] [excited] [sad] [angry] [surprised] [confused] [thinking] [neutral].' + memNote;
+  const r = await groq(S.model, [{ role: 'system', content: sys }, ...S.history.slice(-S.ctxLimit)]);
+  thinking = false;
+  status(navigator.onLine ? 'Ready' : 'Offline');
+  if (!r.ok) { await reply('Online AI abhi nahi chal raha (' + r.reason + '). Settings check karein.'); return; }
+  const tag = r.text.match(/^\s*\[(happy|excited|sad|angry|surprised|confused|thinking|neutral)\]\s*/i);
+  const tone = tag ? tag[1].toLowerCase() : 'neutral';
+  const clean = r.text.replace(/^\s*\[[a-z]+\]\s*/i, '');
+  if (mems.length) add('🧠 Yaad se: ' + mems.map((m) => m.text).join(' · '), 'j');
+  if (canStore()) { S.history.push({ role: 'assistant', content: clean }); S.history = S.history.slice(-30); save(); }
+  add(clean, 'j');
+  await say(clean, tone);
+}
+async function visionAsk(question, url) {
+  const k = activeKey();
+  if (!k) return { ok: false, reason: 'API key nahi hai' };
+  if (!S.vmodel) return { ok: false, reason: 'Settings mein vision model daalein' };
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + k.value },
+      body: JSON.stringify({ model: S.vmodel, messages: [{ role: 'user', content: [
+        { type: 'text', text: question || 'Is photo mein kya hai? Hinglish mein, friendly tone mein batao, aur "boss" se bulao.' },
+        { type: 'image_url', image_url: { url } }
+      ] }] })
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, reason: 'HTTP ' + res.status };
+    const t = j.choices?.[0]?.message?.content?.trim();
+    return t ? { ok: true, text: t } : { ok: false, reason: 'khaali jawab' };
+  } catch { return { ok: false, reason: 'network' }; }
+}
+function imageToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1024 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k);
+      c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => reject(new Error('image'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// ============ TASKS (steps, pause/resume, offline queue, reminders) ============
+function addTask(title, due = '') {
+  const steps = title.split('|').map((s) => s.trim()).filter(Boolean);
+  const t = { id: uid(), title: steps.join(' | '), steps, stepIndex: 0, due: due || '', status: 'pending', log: [], notified: false, at: nowIso() };
+  S.tasks.unshift(t);
+  save(); renderTasks();
+  return t;
+}
+async function runTask(id) {
+  const t = S.tasks.find((x) => x.id === id);
+  if (!t || t.status === 'running') return;
+  if (!navigator.onLine && S.queueOffline) {
+    t.status = 'queued'; t.log.push('Offline: queue mein rakha'); save(); renderTasks(); return;
+  }
+  t.status = 'running'; save(); renderTasks();
+  for (let i = t.stepIndex; i < t.steps.length; i++) {
+    const live = S.tasks.find((x) => x.id === id);
+    if (!live || live.status !== 'running') { save(); renderTasks(); return; } // paused or cancelled
+    const r = await groq(S.model, [{ role: 'system', content: 'Do this step briefly in the user language.' }, { role: 'user', content: t.steps[i] }]);
+    t.stepIndex = i + 1;
+    t.log.push(`Step ${i + 1}: ` + (r.ok ? r.text.slice(0, 300) : 'fail (' + r.reason + ')'));
+    if (!r.ok) { t.status = 'failed'; save(); renderTasks(); await say('Task fail ho gaya: ' + t.title, 'sad'); return; }
+    save(); renderTasks();
+  }
+  t.status = 'done'; save(); renderTasks();
+  await say('Task complete: ' + t.title, 'excited');
+}
+async function flushQueue() {
+  const waiting = S.tasks.filter((x) => x.status === 'queued');
+  for (const t of waiting) { t.status = 'pending'; }
+  save();
+  for (const t of waiting) await runTask(t.id);
+}
+function renderTasks() {
+  const box = $('#tList');
+  box.replaceChildren();
+  if (!S.tasks.length) box.append(el('p', { class: 'hint' }, 'Koi task nahi hai.'));
+  for (const t of S.tasks) {
+    box.append(el('div', { class: 'card' },
+      el('div', { class: 'row' }, el('strong', {}, t.title), el('span', { class: 'badge ' + t.status }, t.status)),
+      t.due ? el('small', {}, 'Reminder: ' + new Date(t.due).toLocaleString()) : null,
+      el('small', {}, t.steps.map((s, i) => (i < t.stepIndex ? '✓ ' : '• ') + s).join(' | ')),
+      t.log.length ? el('small', {}, t.log.slice(-2).join(' | ')) : null,
+      el('div', { class: 'row' },
+        t.status === 'running'
+          ? el('button', { class: 's', on: { click: () => { t.status = 'paused'; save(); renderTasks(); } } }, 'Pause')
+          : el('button', { class: 's', disabled: t.status === 'done' || t.status === 'cancelled', on: { click: () => runTask(t.id) } }, t.stepIndex > 0 ? 'Resume' : 'Run'),
+        el('button', { class: 'g s', on: { click: () => { t.status = 'cancelled'; save(); renderTasks(); } } }, 'Cancel'),
+        el('button', { class: 'g s', on: { click: () => { if (confirmDel('Ye task delete karein?')) { S.tasks = S.tasks.filter((x) => x.id !== t.id); save(); renderTasks(); } } } }, 'Delete')
+      )
+    ));
+  }
+}
+// Reminders: checked every 30 seconds while the app is open
+setInterval(() => {
+  const now = Date.now();
+  for (const t of S.tasks) {
+    if (t.due && !t.notified && t.status === 'pending' && Date.parse(t.due) <= now) {
+      t.notified = true; save();
+      const msg = 'Reminder: ' + t.title;
+      add(msg, 'j');
+      if (!speaking && !busy) say(msg, 'excited');
+      if ('Notification' in window && Notification.permission === 'granted') new Notification('SONIC', { body: msg });
+    }
+  }
+}, 30000);
+window.addEventListener('online', () => { status('Online'); flushQueue(); });
+window.addEventListener('offline', () => status('Offline: online AI band hai'));
+
+// ============ NOTES ============
+function renderNotes() {
+  const q = $('#nSearch').value.toLowerCase();
+  const box = $('#nList');
+  box.replaceChildren();
+  const list = S.notes.filter((n) => n.text.toLowerCase().includes(q)).sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0));
+  if (!list.length) box.append(el('p', { class: 'hint' }, 'Koi note nahi mila.'));
+  for (const n of list) {
+    const tags = (n.text.match(/#[\p{L}\p{N}_]+/gu) || []).join(' ');
+    box.append(el('div', { class: 'card' },
+      el('div', {}, (n.fav ? '★ ' : '') + n.text),
+      tags ? el('small', {}, 'Tags: ' + tags) : null,
+      el('small', {}, new Date(n.at).toLocaleString()),
+      el('div', { class: 'row' },
+        el('button', { class: 'g s', on: { click: () => { n.fav = !n.fav; save(); renderNotes(); } } }, n.fav ? 'Unfavourite' : 'Favourite'),
+        el('button', { class: 'g s', on: { click: () => { if (confirmDel('Ye note delete karein?')) { S.notes = S.notes.filter((x) => x.id !== n.id); save(); renderNotes(); } } } }, 'Delete'))));
+  }
+}
+
+// ============ MEMORY ============
+function renderMemory() {
+  $('#privToggle').checked = S.privateMode;
+  const box = $('#mList');
+  box.replaceChildren();
+  if (!S.memories.length) box.append(el('p', { class: 'hint' }, 'Koi memory nahi hai.'));
+  for (const m of S.memories) {
+    box.append(el('div', { class: 'card row' }, el('span', {}, m.text),
+      el('div', { class: 'row' },
+        el('button', { class: 'g s', on: { click: () => { const v = prompt('Memory update karein:', m.text); if (v && v.trim()) { m.text = v.trim(); save(); renderMemory(); } } } }, 'Edit'),
+        el('button', { class: 'g s', on: { click: () => { if (confirmDel('Ye memory delete karein?')) { S.memories = S.memories.filter((x) => x.id !== m.id); save(); renderMemory(); } } } }, 'Delete'))));
+  }
+}
+$('#mExport').onclick = () => download('sonic-memory.json', JSON.stringify(S.memories, null, 2));
+$('#mImport').onchange = async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const list = JSON.parse(await f.text());
+    for (const m of list) {
+      if (typeof m.text !== 'string' || !m.text.trim()) continue;
+      if (S.memories.some((x) => x.text.toLowerCase() === m.text.trim().toLowerCase())) continue;
+      S.memories.push({ id: uid(), text: m.text.trim(), at: nowIso() });
+    }
+    save(); renderMemory(); status('Memory import ho gayi');
+  } catch { status('Invalid memory file'); }
+};
+
+// ============ STUDENTS AND TEACHING ============
+const BANK = [
+  { topic: 'A se E (alphabets)', items: [
+    { w: 'A', ok: ['a', 'ay', 'ए'] }, { w: 'B', ok: ['b', 'bee', 'बी'] }, { w: 'C', ok: ['c', 'see', 'सी'] },
+    { w: 'D', ok: ['d', 'dee', 'डी'] }, { w: 'E', ok: ['e', 'ee', 'ई'] } ] },
+  { topic: 'Ginti 1 se 5', items: [
+    { w: 'Ek', ok: ['ek', '1', 'one', 'एक'] }, { w: 'Do', ok: ['do', '2', 'two', 'दो'] },
+    { w: 'Teen', ok: ['teen', '3', 'three', 'तीन'] }, { w: 'Chaar', ok: ['chaar', 'char', '4', 'four', 'चार'] },
+    { w: 'Paanch', ok: ['paanch', 'panch', '5', 'five', 'पांच', 'पाँच'] } ] },
+  { topic: 'Rang (colours)', items: [
+    { w: 'Lal', ok: ['lal', 'laal', 'red', 'लाल'] }, { w: 'Neela', ok: ['neela', 'blue', 'नीला'] },
+    { w: 'Hara', ok: ['hara', 'green', 'हरा'] }, { w: 'Peela', ok: ['peela', 'yellow', 'पीला'] } ] },
+  { topic: 'Jaanwar (animals)', items: [
+    { w: 'Billi', ok: ['billi', 'cat', 'बिल्ली'] }, { w: 'Kutta', ok: ['kutta', 'dog', 'कुत्ता'] },
+    { w: 'Gaay', ok: ['gaay', 'gai', 'cow', 'गाय'] }, { w: 'Sher', ok: ['sher', 'lion', 'शेर'] } ] }
+];
+const norm = (s) => s.toLowerCase().replace(/[^\p{L}\p{M}\p{N}]/gu, '');
+// Short answers ("a", "1") must match exactly. Longer ones may appear inside what was heard.
+const isMatch = (heard, ok) => {
+  const h = norm(heard);
+  return ok.some((a) => { const n = norm(a); return n.length <= 2 ? h === n : h.includes(n); });
+};
+const STUDY_RE = /padhna hai|padhna chahta|padhna chahti|पढ़ना है|पढ़ना चाहता|पढ़ना चाहती/i;
+const NOT_NAME = /padh|khel|chahta|chahti|karn|bolo|sun|thak|bhook|khush|udaas|theek|ghar|naya|busy|free|ready|boss|sonic|jarvis|bimar/i;
+function cur() { return S.current || ''; }
+function parseIntro(t) {
+  const m = t.match(/^(?:mera naam|main|mai|mein)\s+(.+?)(?:\s+(?:hoon|hu|hai|hain))?[.!?]?$/i);
+  if (!m) return null;
+  const n = m[1].trim();
+  if (!/^\p{L}+(?:\s\p{L}+)?$/u.test(n) || NOT_NAME.test(n)) return null;
+  return n;
+}
+function introduce(name) {
+  const k = name.toLowerCase();
+  const found = Object.keys(S.students).find((x) => x.toLowerCase() === k);
+  const real = found || name;
+  if (!found) S.students[real] = 0;
+  S.current = real;
+  save(); renderPadhai();
+  return found
+    ? `Wapas aaye ${real}! Chalo padhte hain. Bolo "mujhe padhna hai".`
+    : `Namaste ${real}! Main aapko yaad rakhunga. Padhna hai to bolo "mujhe padhna hai".`;
+}
+async function startStudy() {
+  const name = cur();
+  const idx = name ? (S.students[name] || 0) : 0;
+  const plan = BANK[idx % BANK.length];
+  const ok = await runTopic(plan.topic, plan.items, name || 'bachche');
+  if (ok && name) { S.students[name] = idx + 1; save(); renderPadhai(); }
+}
+// Jarvis says the word, the child repeats it, Jarvis checks. Two tries, then the answer is shown.
+async function runTopic(topic, items, name) {
+  await say(`Chalo ${name}, aaj hum ${topic} seekhenge. Main bolunga, aap repeat karna.`, 'happy');
+  for (const it of items) {
+    let done = false;
+    for (let a = 1; a <= 2 && !done; a++) {
+      if (halt) return false;
+      await say(a === 1 ? `${it.w}. Bolo, ${it.w}.` : `Phir se bolo: ${it.w}.`, 'happy');
+      if (halt) return false;
+      await sleep(500);
+      const r = await recognizeOnce(/[a-z]/i.test(it.w) ? 'en-IN' : S.lang, 8000);
+      if (r.err && r.err !== 'no-speech') status('Mic: ' + r.err);
+      add(r.text ? '🎤 ' + r.text : '🎤 (kuch sunai nahi diya' + (r.err ? ', ' + r.err : '') + ')', r.text ? 'u' : 'j');
+      if (r.text && isMatch(r.text, it.ok)) {
+        const p = ['Shabash!', 'Bahut badhiya!', 'Wah, bahut accha!'][Math.floor(Math.random() * 3)];
+        add(p, 'j');
+        await say(`${p} ${name}!`, 'excited');
+        done = true;
+      } else if (a === 2) {
+        const rv = `Koi baat nahi. Ye hai ${it.w}.`;
+        add(rv, 'j');
+        await say(rv, 'sad');
+      }
+    }
+    if (halt) return false;
+    await sleep(600);
+  }
+  const end = `Bahut badhiya ${name}! Aaj ke sab words ho gaye.`;
+  add(end, 'j');
+  await say(end, 'excited');
+  return true;
+}
+// "teach: topic" -> AI writes the lesson. Lines starting with "SAY:" are call-and-response.
+async function teachLesson(topic) {
+  const name = cur() || 'bachche';
+  add('📚 Lesson: ' + topic, 'j');
+  status('Lesson ban raha hai...');
+  thinking = true; mood = 'thinking';
+  const lang = /hindi|हिंदी|वर्णमाला/i.test(topic) ? 'Hindi (Devanagari)' : 'simple Hinglish';
+  const prompt = `You are a warm teacher for nursery children (age 3 to 5). Teach: "${topic}". ` +
+    `Reply in ${lang}. Address the child as "${name}" and call the others "bachchon". ` +
+    `Write maximum 8 lines, one short sentence per line. ` +
+    `Write 3 to 5 lines that start with "SAY: " followed by only one word for the child to repeat (example: "SAY: Apple"). ` +
+    `Other lines are short normal sentences. Safe, positive content only. No markdown, no numbering.`;
+  const r = await groq(S.model, [{ role: 'user', content: prompt }]);
+  thinking = false;
+  status('Ready');
+  if (!r.ok) { await reply('Lesson nahi ban paya: ' + r.reason); return false; }
+  const lines = r.text.split('\n').map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean).slice(0, 10);
+  S.lastLesson = lines; save();
+  await playLesson(lines, name);
+  return true;
+}
+async function playLesson(lines, name) {
+  for (const line of lines) {
+    if (halt) return;
+    if (line.startsWith('SAY:')) await sayAndCheck(line.slice(4).trim(), name);
+    else { add(line, 'j'); await say(line, 'happy'); }
+    if (halt) return;
+    await sleep(600);
+  }
+}
+async function sayAndCheck(word, name) {
+  add('👉 Bolo: ' + word, 'j');
+  await say(word, 'happy');
+  for (let a = 1; a <= 3 && !halt; a++) {
+    await say(a === 1 ? 'Ab aap bolo.' : 'Phir se bolo.', 'thinking');
+    await sleep(500);
+    const r = await recognizeOnce(/[a-z]/i.test(word) ? 'en-IN' : S.lang, 8000);
+    if (halt) return;
+    add(r.text ? '🎤 ' + r.text : '🎤 (kuch sunai nahi diya)', r.text ? 'u' : 'j');
+    if (r.text && isMatch(r.text, [word])) {
+      const p = ['Shabash ' + name + '!', 'Bahut achha!', 'Wah, bahut badhiya!'][a - 1];
+      add(p, 'j');
+      await say(p, 'excited');
+      return;
+    }
+  }
+  if (!halt) await say('Chalo, agle par chalte hain.', 'happy');
+}
+function renderPadhai() {
+  const box = $('#pList');
+  box.replaceChildren();
+  const names = Object.keys(S.students);
+  if (!names.length) box.append(el('p', { class: 'hint' }, 'Abhi koi bachcha add nahi hai.'));
+  for (const n of names) {
+    const idx = S.students[n] || 0;
+    box.append(el('div', { class: 'card' },
+      el('div', { class: 'row' }, el('strong', {}, n + (S.current === n ? '  (abhi)' : '')), el('small', {}, 'Agla topic: ' + BANK[idx % BANK.length].topic)),
+      el('div', { class: 'row' },
+        el('button', { class: 's', on: { click: () => { S.current = n; save(); renderPadhai(); add('Ab ' + n + ' padhega.', 'j'); } } }, 'Ye bachcha'),
+        el('button', { class: 'g s', on: { click: () => { if (confirmDel('Ye bachcha delete karein?')) { delete S.students[n]; if (S.current === n) S.current = ''; save(); renderPadhai(); } } } }, 'Delete'))));
+  }
+}
+$('#pStart').onclick = () => handleText('mujhe padhna hai');
+$('#pAdd').onclick = () => {
+  const n = prompt('Bachche ka naam:');
+  if (n && n.trim()) { introduce(n.trim()); renderPadhai(); }
+};
+$('#pAi').onclick = () => {
+  const topic = $('#pTopic').value.trim();
+  if (topic) handleText('teach: ' + topic);
+};
+
+// ============ SETTINGS AND KEYS ============
+function renderKeys() {
+  const box = $('#kList');
+  box.replaceChildren();
+  if (!S.keys.length) box.append(el('p', { class: 'hint' }, 'Abhi koi key nahi hai. Neeche key add karein.'));
+  S.keys.forEach((k, i) => {
+    const on = k.enabled !== false;
+    box.append(el('div', { class: 'card row' },
+      el('span', {}, (i === S.activeKey ? '● ' : '○ ') + k.label + '  ····' + k.value.slice(-4) + (on ? '' : ' (disabled)') + (k.status ? ' [' + k.status + ']' : '')),
+      el('div', { class: 'row' },
+        el('button', { class: 's', on: { click: () => { S.activeKey = i; save(); renderKeys(); } } }, 'Use'),
+        el('button', { class: 'g s', on: { click: () => { k.enabled = !on; save(); renderKeys(); } } }, on ? 'Disable' : 'Enable'),
+        el('button', { class: 'g s', on: { click: () => { S.keys.splice(i, 1); if (S.activeKey >= S.keys.length) S.activeKey = 0; save(); renderKeys(); } } }, 'Remove'))));
+  });
+}
+$('#kAdd').onclick = () => {
+  const v = $('#kVal').value.trim();
+  if (v.length < 8) { status('Key bahut chhoti hai'); return; }
+  S.keys.push({ label: $('#kLabel').value.trim() || ('Key ' + (S.keys.length + 1)), value: v });
+  if (S.keys.length === 1) S.activeKey = 0;
+  $('#kVal').value = ''; $('#kLabel').value = '';
+  save(); renderKeys(); status('Key add ho gayi');
+};
+$('#kTest').onclick = async () => {
+  status('Key test ho rahi hai...');
+  const r = await groq(S.model, [{ role: 'user', content: 'Reply with the single word OK.' }]);
+  status(r.ok ? 'Key OK' : 'Key test fail: ' + r.reason);
+};
+
+function bindSettings() {
+  const sv = (k, v) => { S[k] = v; save(); applyLook(); };
+  $('#model').value = S.model;
+  $('#model').onchange = (e) => sv('model', e.target.value.trim() || DEF.model);
+  $('#vmodel').value = S.vmodel;
+  $('#vmodel').onchange = (e) => sv('vmodel', e.target.value.trim());
+  $('#lang').value = S.lang;
+  $('#lang').onchange = (e) => sv('lang', e.target.value);
+  $('#rate').value = S.rate;
+  $('#rate').onchange = (e) => sv('rate', Number(e.target.value));
+  $('#vol').value = S.vol;
+  $('#vol').onchange = (e) => sv('vol', Number(e.target.value));
+  $('#bargeIn').checked = S.bargeIn;
+  $('#bargeIn').onchange = (e) => sv('bargeIn', e.target.checked);
+  $('#contSet').checked = S.cont;
+  $('#contSet').onchange = (e) => { sv('cont', e.target.checked); paintToggles(); refreshListen(); };
+  $('#wakeSet').checked = S.wake;
+  $('#wakeSet').onchange = (e) => { sv('wake', e.target.checked); paintToggles(); refreshListen(); };
+  $('#accent').value = S.accent;
+  $('#accent').onchange = (e) => sv('accent', e.target.value);
+  $('#theme').value = S.theme;
+  $('#theme').onchange = (e) => sv('theme', e.target.value);
+  $('#confirmDel').checked = S.confirmDelete;
+  $('#confirmDel').onchange = (e) => sv('confirmDelete', e.target.checked);
+  $('#queueOff').checked = S.queueOffline;
+  $('#queueOff').onchange = (e) => sv('queueOffline', e.target.checked);
+  $('#retries').value = S.retries;
+  $('#retries').onchange = (e) => sv('retries', Math.max(0, Math.min(5, Number(e.target.value) || 0)));
+  $('#timeoutSec').value = S.timeoutSec;
+  $('#timeoutSec').onchange = (e) => sv('timeoutSec', Math.max(5, Math.min(60, Number(e.target.value) || 20)));
+  $('#ctxLimit').value = S.ctxLimit;
+  $('#ctxLimit').onchange = (e) => sv('ctxLimit', Math.max(1, Math.min(20, Number(e.target.value) || 8)));
+  $('#respLen').value = S.respLen;
+  $('#respLen').onchange = (e) => sv('respLen', e.target.value);
+  $('#memoryUse').checked = S.memoryUse;
+  $('#memoryUse').onchange = (e) => sv('memoryUse', e.target.checked);
+  $('#offlineMode').checked = S.offlineMode;
+  $('#offlineMode').onchange = (e) => sv('offlineMode', e.target.checked);
+  $('#privSet').checked = S.privateMode;
+  $('#privSet').onchange = (e) => { sv('privateMode', e.target.checked); renderMemory(); };
+  $('#micCheck').onclick = async () => {
+    try { const p = await navigator.permissions.query({ name: 'microphone' }); status('Mic permission: ' + p.state); }
+    catch { status('Mic permission check support nahi hai'); }
+  };
+  $('#notifBtn').onclick = async () => {
+    if (!('Notification' in window)) { status('Notification support nahi hai'); return; }
+    status('Notification: ' + await Notification.requestPermission());
+  };
+  $('#setExport').onclick = () => {
+    const out = {};
+    for (const k of SETTING_KEYS) out[k] = S[k];
+    download('sonic-settings.json', JSON.stringify(out, null, 2));
+  };
+  $('#setImport').onchange = async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      const obj = JSON.parse(await f.text());
+      for (const k of SETTING_KEYS) if (k in obj) S[k] = obj[k];
+      save(); applyLook(); bindSettings(); status('Settings import ho gayi');
+    } catch { status('Invalid settings file'); }
+  };
+  $('#setReset').onclick = () => {
+    if (!confirm('Settings wapas default par?')) return;
+    for (const k of SETTING_KEYS) S[k] = DEF[k];
+    save(); applyLook(); bindSettings(); paintToggles(); status('Settings reset ho gayi');
+  };
+  $('#dataDel').onclick = () => {
+    if (confirm('Sab data (keys, notes, tasks, memory, students, history) delete ho jayega. Continue?')) {
+      localStorage.removeItem(KEY);
+      location.reload();
+    }
+  };
+  renderKeys();
+}
+function fillVoices() {
+  const sel = $('#voice');
+  const voices = ('speechSynthesis' in window) ? speechSynthesis.getVoices() : [];
+  sel.replaceChildren(el('option', { value: '' }, 'Auto (bhasha ke hisaab se)'));
+  for (const v of voices) sel.append(el('option', { value: v.name }, v.name + ' (' + v.lang + ')'));
+  sel.value = S.voice;
+  sel.onchange = (e) => { S.voice = e.target.value; save(); };
+}
+if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = fillVoices;
+
+// ============ TABS AND BUTTONS ============
+$$('nav button').forEach((b) => b.onclick = () => {
+  $$('nav button').forEach((x) => x.classList.toggle('active', x === b));
+  $$('section').forEach((s) => s.classList.toggle('active', s.id === 's-' + b.dataset.t));
+  if (b.dataset.t === 'tasks') renderTasks();
+  if (b.dataset.t === 'notes') renderNotes();
+  if (b.dataset.t === 'memory') renderMemory();
+  if (b.dataset.t === 'padhai') renderPadhai();
+  if (b.dataset.t === 'settings') bindSettings();
+});
+$('#send').onclick = () => { const v = $('#txt').value; $('#txt').value = ''; if (v.trim()) handleText(v); };
+$('#txt').onkeydown = (e) => { if (e.key === 'Enter') $('#send').click(); };
+$('#stop').onclick = stopAll;
+$('#mic').onclick = () => { micOn = !micOn; paintToggles(); refreshListen(); };
+$('#cont').onclick = () => { S.cont = !S.cont; save(); paintToggles(); refreshListen(); };
+$('#wake').onclick = () => { S.wake = !S.wake; save(); paintToggles(); refreshListen(); };
+function paintToggles() {
+  $('#cont').textContent = 'Continuous: ' + (S.cont ? 'on' : 'off');
+  $('#wake').textContent = 'Wake word: ' + (S.wake ? 'on' : 'off');
+  $('#cont').classList.toggle('on', S.cont);
+  $('#wake').classList.toggle('on', S.wake);
+  $('#mic').classList.toggle('on', micOn);
+  if ($('#contSet')) { $('#contSet').checked = S.cont; $('#wakeSet').checked = S.wake; }
+}
+$('#fsBtn').onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.().catch(() => status('Full screen support nahi hai'));
+};
+$('#cam').onclick = () => $('#camFile').click();
+$('#camFile').onchange = async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  const q = $('#txt').value.trim();
+  $('#txt').value = '';
+  add('📷 Photo' + (q ? ': ' + q : ''), 'u');
+  busy = true;
+  try {
+    const url = await imageToDataUrl(f);
+    const r = await visionAsk(q, url);
+    await reply(r.ok ? r.text : 'Photo analyze nahi hui: ' + r.reason);
+  } catch { await reply('Photo load nahi hui.'); }
+  finally { busy = false; }
+};
+$('#tAdd').onclick = () => {
+  const title = $('#tTitle').value.trim();
+  if (!title) return;
+  if (!canStore()) { status('Private mode on hai, task save nahi hoga'); return; }
+  addTask(title, $('#tDue').value);
+  $('#tTitle').value = ''; $('#tDue').value = '';
+};
+$('#nAdd').onclick = () => {
+  const v = $('#nText').value.trim();
+  if (!v) return;
+  if (!canStore()) { status('Private mode on hai, note save nahi hoga'); return; }
+  S.notes.unshift({ id: uid(), text: v, at: nowIso() }); save();
+  $('#nText').value = ''; renderNotes();
+};
+$('#nSearch').oninput = renderNotes;
+$('#nExport').onclick = () => download('sonic-notes.json', JSON.stringify(S.notes, null, 2));
+$('#chatExport').onclick = () => download('sonic-chat.txt', S.history.map((m) => m.role + ': ' + m.content).join('\n'));
+$('#mAdd').onclick = () => {
+  const v = $('#mText').value.trim();
+  if (!v) return;
+  if (!canStore()) { status('Private mode on hai, memory save nahi hogi'); return; }
+  S.memories.unshift({ id: uid(), text: v, at: nowIso() }); save();
+  $('#mText').value = ''; renderMemory();
+};
+$('#mExport').onclick = () => download('sonic-memory.json', JSON.stringify(S.memories, null, 2));
+$('#privToggle').onchange = (e) => { S.privateMode = e.target.checked; save(); $('#privSet').checked = S.privateMode; };
+
+// ============ START ============
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+applyLook();
+paintToggles();
+renderTasks();
+renderNotes();
+renderMemory();
+renderPadhai();
+for (const t of S.tasks) {
+  if (t.status === 'running') { t.status = 'paused'; t.log.push('App band hui thi. Resume karein, ye wahi step se chalega jahan ruka tha.'); }
+}
+save();
+if (S.tasks.some((t) => t.status === 'queued')) flushQueue();
+status(navigator.onLine ? 'Ready' : 'Offline');
+add('Namaste boss! Main SONIC hoon. Mic dabao ya type karo.\nExamples: "main Riya hoon", "mujhe padhna hai", "teach: 1 se 5 ginti", "task: kal ka plan | shopping", "yaad rakho: mera naam Rahul hai", "flashlight on".', 'j');
+if (!S.keys.length) add('Shuru karne ke liye Settings mein Groq API key daalein.', 'j');
+</script>
 </body>
 </html>
