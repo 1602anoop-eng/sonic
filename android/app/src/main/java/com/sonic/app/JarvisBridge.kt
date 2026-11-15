@@ -8,17 +8,29 @@ import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import org.json.JSONObject
+import java.util.Locale
 
 // Bridge between the SONIC web page and Android.
-// The web page calls: window.JarvisNative.run(json), startListening(lang), stopListening()
-// Android calls back into the web page: window.onNativeSpeech(text), window.onNativeSpeechError(code)
+// The web page calls: window.JarvisNative.run(json), startListening(lang), stopListening(), speak(text, lang, rate), stopSpeaking()
+// Android calls back into the web page: window.onNativeSpeech(text), window.onNativeSpeechError(code), window.onNativeSpeakDone()
 class JarvisBridge(private val ctx: Context, private val web: WebView) {
 
     private val main = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
+    private var tts: TextToSpeech? = null
+    private var ttsReady = false
+    private var utterCount = 0
+
+    init {
+        tts = TextToSpeech(ctx) { status ->
+            ttsReady = (status == TextToSpeech.SUCCESS)
+        }
+    }
 
     @JavascriptInterface
     fun run(json: String): String {
@@ -28,6 +40,8 @@ class JarvisBridge(private val ctx: Context, private val web: WebView) {
             JSONObject().put("ok", false).put("message", "Bad request").toString()
         }
     }
+
+    // ---------- Speech recognition (mic) ----------
 
     @JavascriptInterface
     fun startListening(lang: String) {
@@ -81,6 +95,46 @@ class JarvisBridge(private val ctx: Context, private val web: WebView) {
         recognizer = null
     }
 
+    // ---------- Speech output (awaaz) ----------
+
+    // Speaks the text with Android's own Text-to-Speech. The web page waits for onNativeSpeakDone().
+    @JavascriptInterface
+    fun speak(text: String, lang: String, rate: Double) {
+        main.post {
+            val engine = tts
+            if (engine == null || !ttsReady) {
+                sendDone()
+                return@post
+            }
+            engine.language = toLocale(lang)
+            engine.setSpeechRate(rate.toFloat().coerceIn(0.5f, 1.5f))
+            engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {}
+                override fun onDone(utteranceId: String?) { sendDone() }
+                @Deprecated("Deprecated in Java")
+                override fun onError(utteranceId: String?) { sendDone() }
+            })
+            utterCount++
+            engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "u$utterCount")
+        }
+    }
+
+    @JavascriptInterface
+    fun stopSpeaking() {
+        main.post {
+            tts?.stop()
+            sendDone()
+        }
+    }
+
+    private fun toLocale(lang: String): Locale = when (lang) {
+        "hi-IN" -> Locale("hi", "IN")
+        "en-IN" -> Locale("en", "IN")
+        else -> Locale.US
+    }
+
+    // ---------- Helpers ----------
+
     // Only these three language codes are allowed. Anything else falls back to Hindi.
     private fun safeLang(lang: String): String =
         if (lang == "hi-IN" || lang == "en-IN" || lang == "en-US") lang else "hi-IN"
@@ -98,6 +152,12 @@ class JarvisBridge(private val ctx: Context, private val web: WebView) {
             web.evaluateJavascript(
                 "window.onNativeSpeechError && window.onNativeSpeechError(" + JSONObject.quote(code) + ");", null
             )
+        }
+    }
+
+    private fun sendDone() {
+        main.post {
+            web.evaluateJavascript("window.onNativeSpeakDone && window.onNativeSpeakDone();", null)
         }
     }
 
