@@ -41,6 +41,12 @@ class JarvisBridge(private val ctx: Context, private val web: WebView) {
         }
     }
 
+    // Turns the background "Hey SONIC" listener on or off (shows a notification while on)
+    @JavascriptInterface
+    fun setBackgroundWake(on: Boolean) {
+        main.post { if (on) VoiceService.start(ctx) else VoiceService.stop(ctx) }
+    }
+
     // ---------- Speech recognition (mic) ----------
 
     @JavascriptInterface

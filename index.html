@@ -221,6 +221,7 @@ section{padding-bottom:96px}
     <label class="f c"><input id="bargeIn" type="checkbox"> Barge-in (Jarvis bolte waqt aap bolein to ruk jaye; headphones best)</label>
     <label class="f c"><input id="contSet" type="checkbox"> Continuous conversation</label>
     <label class="f c"><input id="wakeSet" type="checkbox"> Wake word ("Hey SONIC" / "Hey Jarvis")</label>
+    <label class="f c"><input id="bgWake" type="checkbox"> Background wake word (app band ho to bhi sunna; notification dikhegi)</label>
     <div class="row"><button id="micCheck" class="g s">Mic permission check</button><button id="notifBtn" class="g s">Notifications allow karein</button></div>
 
     <h3>Look</h3>
@@ -263,11 +264,11 @@ const DEF = {
   lang: 'hi-IN', voice: '', rate: 0.95, vol: 1,
   cont: false, wake: false, bargeIn: false,
   accent: '#00e5ff', theme: 'dark',
-  retries: 2, timeoutSec: 20, ctxLimit: 8, respLen: 'normal', memoryUse: true, offlineMode: false, voiceProfile: 'auto',
+  retries: 2, timeoutSec: 20, ctxLimit: 8, respLen: 'normal', memoryUse: true, offlineMode: false, voiceProfile: 'auto', bgWake: false,
   privateMode: false, confirmDelete: true, queueOffline: true,
   students: {}, current: '', history: [], chatLog: [], tasks: [], notes: [], memories: [], lastLesson: []
 };
-const SETTING_KEYS = ['model', 'vmodel', 'lang', 'voice', 'rate', 'vol', 'cont', 'wake', 'bargeIn', 'accent', 'theme', 'privateMode', 'confirmDelete', 'queueOffline', 'retries', 'timeoutSec', 'ctxLimit', 'respLen', 'memoryUse', 'offlineMode', 'voiceProfile'];
+const SETTING_KEYS = ['model', 'vmodel', 'lang', 'voice', 'rate', 'vol', 'cont', 'wake', 'bargeIn', 'accent', 'theme', 'privateMode', 'confirmDelete', 'queueOffline', 'retries', 'timeoutSec', 'ctxLimit', 'respLen', 'memoryUse', 'offlineMode', 'voiceProfile', 'bgWake'];
 let S = { ...DEF, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
 const save = () => localStorage.setItem(KEY, JSON.stringify(S));
 const $ = (s) => document.querySelector(s);
@@ -1108,6 +1109,11 @@ function bindSettings() {
   $('#vprofile').value = S.voiceProfile || 'auto';
   $('#vprofile').onchange = (e) => sv('voiceProfile', e.target.value);
   $('#vTest').onclick = () => say('Namaste! Main SONIC hoon. Ye meri awaaz hai.', 'happy');
+  $('#bgWake').checked = S.bgWake;
+  $('#bgWake').onchange = (e) => {
+    sv('bgWake', e.target.checked);
+    if (window.JarvisNative && window.JarvisNative.setBackgroundWake) window.JarvisNative.setBackgroundWake(e.target.checked);
+  };
   $('#privSet').checked = S.privateMode;
   $('#privSet').onchange = (e) => { sv('privateMode', e.target.checked); renderMemory(); };
   $('#micCheck').onclick = async () => {
@@ -1338,6 +1344,20 @@ function netUpdate() { $('#net').classList.toggle('off', !navigator.onLine); }
 window.addEventListener('online', netUpdate);
 window.addEventListener('offline', netUpdate);
 
+// Background "Hey SONIC": the Android service sends the words here
+window.onBackgroundWake = async (text) => {
+  if (busy) return;
+  const m = text.match(WAKE_RE);
+  const q = m ? text.slice(m.index + m[0].length).replace(/^[\s,.!?।]+/, '') : text;
+  if (q.trim()) { await handleText(q); return; }
+  busy = true;
+  try {
+    await say('Ji boss, bolo.', 'happy');
+    const r = await recognizeOnce(S.lang, 9000);
+    if (r.text) await handleText(r.text);
+  } finally { busy = false; }
+};
+
 // ============ START ============
 if (!localStorage.getItem('sonic.wakeDefault')) { S.wake = true; save(); localStorage.setItem('sonic.wakeDefault', '1'); }
 sizeWave();
@@ -1346,6 +1366,7 @@ netUpdate();
 showSection('home');
 renderChat();
 if (window.JarvisNative) refreshListen();
+if (S.bgWake && window.JarvisNative && window.JarvisNative.setBackgroundWake) window.JarvisNative.setBackgroundWake(true);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 applyLook();
 paintToggles();
