@@ -13,13 +13,6 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-
-        // The Picovoice key comes from a GitHub Secret (PICOVOICE_ACCESS_KEY). It is never written in the code.
-        buildConfigField("String", "PICOVOICE_KEY", "\"${System.getenv("PICOVOICE_ACCESS_KEY") ?: ""}\"")
-    }
-
-    buildFeatures {
-        buildConfig = true
     }
 
     buildTypes {
@@ -39,6 +32,9 @@ android {
 
 dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
-    // Offline "Hey SONIC" wake-word engine (check the latest version on Maven Central before building)
-    implementation("ai.picovoice:porcupine-android:3.0.2")
+    implementation("androidx.core:core-ktx:1.13.1")
+    // Vosk offline speech engine (check the latest version on Maven Central before building)
+    implementation("com.alphacephei:vosk-android:0.3.47@aar")
+    // Vosk needs JNA to work on Android
+    implementation("net.java.dev.jna:jna:5.14.0@aar")
 }

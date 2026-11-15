@@ -1,7 +1,5 @@
 package com.sonic.app
 
-import ai.picovoice.porcupine.PorcupineManager
-import ai.picovoice.porcupine.PorcupineManagerCallback
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -14,22 +12,33 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.speech.RecognitionListener
+import android.speech.RecognitionListener as AndroidRecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.core.app.NotificationCompat
+import org.json.JSONObject
+import org.vosk.Model
+import org.vosk.Recognizer
+import org.vosk.android.RecognitionListener
+import org.vosk.android.SpeechService
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.zip.ZipInputStream
 
 // Keeps "Hey SONIC" listening while the app is in the background.
-// Engine 1 (reliable, offline): Porcupine wake-word engine, used when the Picovoice key and keyword file are set up.
-// Engine 2 (fallback): normal speech recognition loop, used when Porcupine is not set up.
+// Engine 1 (offline, free): Vosk. The small English (India) model is downloaded once on first run.
+// Engine 2 (fallback): normal speech recognition, used if the Vosk model cannot be loaded.
 // A notification is shown while this runs (Android requires it for microphone use in the background).
 class VoiceService : Service() {
 
     private val main = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
-    private var porcupine: PorcupineManager? = null
+    private var model: Model? = null
+    private var speech: SpeechService? = null
     private var running = false
+    private var loadingModel = false
+    private var modelFailed = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -42,7 +51,7 @@ class VoiceService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             running = false
-            main.post { release() }
+            main.post { shutdownVosk(); release() }
             stopSelf()
             return START_NOT_STICKY
         }
@@ -57,16 +66,16 @@ class VoiceService : Service() {
     override fun onDestroy() {
         running = false
         instance = null
-        main.post { release() }
-        try { porcupine?.delete() } catch (e: Exception) { /* already released */ }
-        porcupine = null
+        main.post { shutdownVosk(); release() }
         super.onDestroy()
     }
 
     // Called by MainActivity: while the SONIC screen is open, the screen listens, so the service steps aside
     fun pauseDetection() {
-        try { porcupine?.stop() } catch (e: Exception) { /* not running */ }
-        main.post { release() }
+        main.post {
+            try { speech?.stop() } catch (e: Exception) { /* not running */ }
+            release()
+        }
     }
 
     fun resumeDetection() {
@@ -79,8 +88,20 @@ class VoiceService : Service() {
             main.postDelayed({ startDetection() }, 1000)
             return
         }
-        if (startPorcupine()) return
-        listenOnce()
+        val m = model
+        if (m != null) {
+            startVosk(m)
+            return
+        }
+        if (loadingModel) {
+            main.postDelayed({ startDetection() }, 1500)
+            return
+        }
+        if (modelFailed) {
+            listenOnce()
+            return
+        }
+        loadModel()
     }
 
     private fun startForegroundCompat() {
@@ -114,35 +135,118 @@ class VoiceService : Service() {
         }
     }
 
-    // ---------- Engine 1: Porcupine (reliable offline wake word) ----------
+    // ---------- Engine 1: Vosk (offline wake word) ----------
 
-    private fun startPorcupine(): Boolean {
-        porcupine?.let {
-            return try { it.start(); true } catch (e: Exception) { false }
-        }
-        val key = BuildConfig.PICOVOICE_KEY
-        if (key.isBlank()) return false
-        return try {
-            val file = File(filesDir, KEYWORD_FILE)
-            if (!file.exists()) {
-                assets.open(KEYWORD_FILE).use { inp -> file.outputStream().use { inp.copyTo(it) } }
+    // Downloads the model once (in a background thread), then starts listening
+    private fun loadModel() {
+        loadingModel = true
+        Thread {
+            var ok = false
+            try {
+                val root = File(filesDir, "vosk")
+                root.mkdirs()
+                var dir = findModelDir(root)
+                if (dir == null) {
+                    val zip = File(root, "model.zip")
+                    downloadTo(MODEL_URL, zip)
+                    unzip(zip, root)
+                    zip.delete()
+                    dir = findModelDir(root)
+                }
+                if (dir != null) {
+                    model = Model(dir.absolutePath)
+                    ok = true
+                }
+            } catch (e: Exception) {
+                ok = false
             }
-            val pm = PorcupineManager.Builder()
-                .setAccessKey(key)
-                .setKeywordPath(file.absolutePath)
-                .build(applicationContext, PorcupineManagerCallback { _ -> main.post { onWakeDetected() } })
-            porcupine = pm
-            pm.start()
-            true
-        } catch (e: Exception) {
-            porcupine = null
-            false
+            loadingModel = false
+            modelFailed = !ok
+            main.post { startDetection() }
+        }.start()
+    }
+
+    private fun findModelDir(root: File): File? =
+        root.listFiles()?.firstOrNull { it.isDirectory && it.name.startsWith("vosk-model") }
+
+    private fun downloadTo(urlText: String, file: File) {
+        val conn = URL(urlText).openConnection() as HttpURLConnection
+        conn.connectTimeout = 15000
+        conn.readTimeout = 60000
+        conn.inputStream.use { inp -> file.outputStream().use { inp.copyTo(it) } }
+        conn.disconnect()
+    }
+
+    private fun unzip(zip: File, dest: File) {
+        val destPath = dest.canonicalPath
+        ZipInputStream(zip.inputStream()).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                val out = File(dest, entry.name)
+                // Safety: refuse files that try to land outside the model folder
+                if (!out.canonicalPath.startsWith(destPath)) throw SecurityException("bad zip entry")
+                if (entry.isDirectory) {
+                    out.mkdirs()
+                } else {
+                    out.parentFile?.mkdirs()
+                    out.outputStream().use { zis.copyTo(it) }
+                }
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
         }
     }
 
-    private fun onWakeDetected() {
+    private fun startVosk(m: Model) {
+        try {
+            if (speech == null) {
+                val rec = Recognizer(m, 16000f, GRAMMAR)
+                speech = SpeechService(rec, 16000f)
+            }
+            speech?.startListening(voskListener)
+        } catch (e: Exception) {
+            // Already listening, or the microphone is busy: try again shortly
+            main.postDelayed({ startDetection() }, 1500)
+        }
+    }
+
+    private fun shutdownVosk() {
+        try { speech?.shutdown() } catch (e: Exception) { /* ignore */ }
+        speech = null
+        try { model?.close() } catch (e: Exception) { /* ignore */ }
+        model = null
+    }
+
+    private val voskListener = object : RecognitionListener {
+        override fun onPartialResult(hypothesis: String?) { checkWake(hypothesis) }
+        override fun onResult(hypothesis: String?) { checkWake(hypothesis) }
+        override fun onFinalResult(hypothesis: String?) { checkWake(hypothesis) }
+        override fun onError(exception: Exception?) {
+            main.post {
+                try { speech?.stop() } catch (e: Exception) { /* ignore */ }
+                main.postDelayed({ startDetection() }, 1000)
+            }
+        }
+        override fun onTimeout() {}
+    }
+
+    private fun checkWake(json: String?) {
+        if (json.isNullOrBlank()) return
+        val text = try {
+            val o = JSONObject(json)
+            o.optString("text").ifBlank { o.optString("partial") }
+        } catch (e: Exception) {
+            ""
+        }
+        if (text.isNotBlank() && WAKE.containsMatchIn(text)) {
+            main.post { onWakeDetected(text) }
+        }
+    }
+
+    private fun onWakeDetected(text: String) {
         if (appVisible) return
-        openApp("hey sonic")
+        try { speech?.stop() } catch (e: Exception) { /* ignore */ }
+        openApp(text)
     }
 
     // ---------- Engine 2: normal speech recognition (fallback) ----------
@@ -161,7 +265,7 @@ class VoiceService : Service() {
         release()
         val r = SpeechRecognizer.createSpeechRecognizer(this)
         recognizer = r
-        r.setRecognitionListener(object : RecognitionListener {
+        r.setRecognitionListener(object : AndroidRecognitionListener {
             override fun onResults(results: Bundle?) {
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: ""
                 release()
@@ -191,7 +295,7 @@ class VoiceService : Service() {
     // ---------- Opening SONIC after the wake word ----------
 
     // Opens SONIC. A full-screen notification is used because Android blocks plain background launches.
-    // When the phone is locked, Android shows SONIC on the lock screen. The user still needs PIN, pattern or fingerprint to unlock.
+    // On the lock screen, SONIC appears, but the user must still unlock with PIN, pattern or fingerprint.
     private fun openApp(text: String) {
         val i = Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -223,7 +327,12 @@ class VoiceService : Service() {
         const val ALERT_CHANNEL = "sonic_wake"
         const val NOTIF_ID = 41
         const val ALERT_ID = 42
-        const val KEYWORD_FILE = "hey_sonic.ppn"
+
+        // Small English (India) model, about 40 MB, downloaded once. Check the exact file name on alphacephei.com/vosk/models
+        const val MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-in-0.4.zip"
+
+        // Only these words are listened for, which makes "Hey SONIC" more accurate
+        const val GRAMMAR = "[\"hey sonic\", \"sonic\", \"jarvis\", \"[unk]\"]"
 
         // True while the SONIC screen is open (MainActivity sets it)
         @Volatile var appVisible = false
