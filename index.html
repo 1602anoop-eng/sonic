@@ -238,6 +238,23 @@ function voiceFor(text) {
   return all.find((x) => x.lang.toLowerCase().startsWith(want)) || null;
 }
 function sayWait(text, m = 'neutral') {
+  // Android app: use the phone's own Text-to-Speech (browser speech does not work in the app)
+  if (window.JarvisNative && window.JarvisNative.speak) {
+    return new Promise((resolve) => {
+      speaking = true;
+      mood = m;
+      pulse = 1;
+      window.onNativeSpeakDone = () => {
+        window.onNativeSpeakDone = null;
+        speaking = false;
+        mood = 'neutral';
+        pulse = 0;
+        resolve();
+      };
+      try { window.JarvisNative.speak(text, S.lang, S.rate); }
+      catch { window.onNativeSpeakDone(); }
+    });
+  }
   return new Promise((resolve) => {
     if (!('speechSynthesis' in window)) { resolve(); return; }
     speechSynthesis.cancel();
@@ -415,6 +432,7 @@ function stopAll() {
   halt = true;
   try { activeRec && activeRec.abort(); } catch { /* not running */ }
   if ('speechSynthesis' in window) speechSynthesis.cancel();
+  if (window.JarvisNative && window.JarvisNative.stopSpeaking) { try { window.JarvisNative.stopSpeaking(); } catch { /* ignore */ } }
   speaking = false; thinking = false; mood = 'neutral';
   for (const t of S.tasks) if (t.status === 'running') t.status = 'paused';
   save(); renderTasks();
