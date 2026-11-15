@@ -46,18 +46,54 @@ button.on{background:#7c3aed;color:#fff;border-color:#7c3aed}
 .badge{font-size:12px;padding:3px 8px;border-radius:999px;background:var(--user)}
 .badge.done{background:#064e3b;color:#e6fff5}.badge.failed{background:#7f1d1d;color:#fff}.badge.running{background:#4c1d95;color:#fff}.badge.paused,.badge.queued{background:#78350f;color:#fff}.badge.cancelled{background:#3f3f46;color:#fff}
 h3{margin:6px 0}
+/* ---- Home screen (voice-first) ---- */
+body{background:radial-gradient(circle at 50% 28%,#0f1d3a 0%,#060a14 72%)}
+section{padding-bottom:96px}
+.home{align-items:center;gap:6px}
+.greet{text-align:center;margin-top:4px}
+.gh{font-size:26px;font-weight:700;color:var(--text)}
+.gs{color:var(--muted);font-size:15px}
+.orbWrap{position:relative;width:220px;height:220px;margin:6px auto}
+.ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(0,229,255,.55);animation:ringPulse 2.6s ease-out infinite;pointer-events:none}
+.r2{animation-delay:.87s;border-color:rgba(124,58,237,.6)}
+.r3{animation-delay:1.73s;border-color:rgba(0,229,255,.35)}
+@keyframes ringPulse{0%{transform:scale(.55);opacity:.95}100%{transform:scale(1.12);opacity:0}}
+.orb{position:absolute;left:50%;top:50%;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;padding:0;font-size:44px;color:#fff;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 30%,#8ff9ff 0%,#00b3ff 42%,#5b2bd6 100%);box-shadow:0 0 28px #00e5ff,0 0 64px rgba(124,58,237,.8);transition:transform .2s,box-shadow .2s}
+.orb:active{transform:scale(.95)}
+.orb.on{box-shadow:0 0 54px #00e5ff,0 0 96px rgba(124,58,237,.95)}
+.orb.speak{animation:orbSpeak .7s ease-in-out infinite alternate}
+@keyframes orbSpeak{from{transform:scale(1);box-shadow:0 0 30px #00e5ff,0 0 64px rgba(124,58,237,.8)}to{transform:scale(1.08);box-shadow:0 0 60px #00e5ff,0 0 110px rgba(124,58,237,1)}}
+.wave{width:100%;max-width:520px;height:90px;display:block}
+.vstatus{color:var(--accent);letter-spacing:3px;font-size:14px;text-transform:uppercase;font-weight:600}
+.shortcuts{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:520px;margin-top:6px}
+.sc{display:flex;flex-direction:column;align-items:center;gap:6px;background:linear-gradient(160deg,rgba(17,26,46,.95),rgba(12,18,34,.95));border:1px solid rgba(0,229,255,.25);color:var(--text);padding:14px 8px;font-size:24px;box-shadow:0 0 14px rgba(124,58,237,.18)}
+.sc span{font-size:14px;color:var(--muted)}
+.sc:last-child{grid-column:span 2}
+.bottom{position:fixed;left:0;right:0;bottom:0;z-index:4;display:flex;justify-content:space-around;align-items:flex-end;padding:6px 12px calc(6px + env(safe-area-inset-bottom));background:rgba(12,18,34,.96);border-top:1px solid var(--line)}
+.bn{background:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;font-size:20px;padding:4px 10px;border:0}
+.bn span{font-size:12px}
+.bn.active{color:var(--accent)}
+.bn.mic{background:var(--accent);color:#0b0f1a;border-radius:50%;width:60px;height:60px;padding:0;margin-top:-26px;font-size:24px;justify-content:center;box-shadow:0 0 22px #00e5ff}
+.sheet{position:fixed;left:10px;right:10px;bottom:84px;z-index:5;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.sheet[hidden]{display:none!important}
+.dot{width:9px;height:9px;border-radius:50%;background:#34d399;display:inline-block}
+.dot.off{background:#f87171}
+.hdr-right{display:flex;align-items:center;gap:6px}
+@media (min-width:700px){.gh{font-size:32px}.orb{width:150px;height:150px;margin:-75px 0 0 -75px;font-size:52px}.orbWrap{width:260px;height:260px}}
 </style>
 </head>
 <body>
 <header>
   <div class="brand">SONIC</div>
-  <div class="row" style="flex-wrap:nowrap">
+  <div class="hdr-right">
+    <span id="net" class="dot"></span>
     <div id="status">Ready</div>
+    <button id="setBtn" class="g s" title="Settings">⚙</button>
     <button id="fsBtn" class="g s" title="Full screen">⛶</button>
   </div>
 </header>
 
-<nav>
+<nav class="topnav" hidden>
   <button data-t="chat" class="active">Chat</button>
   <button data-t="tasks">Tasks</button>
   <button data-t="notes">Notes</button>
@@ -67,8 +103,30 @@ h3{margin:6px 0}
 </nav>
 
 <main>
+  <!-- HOME (voice-first) -->
+  <section id="s-home" class="active home">
+    <div class="greet">
+      <div class="gh">Hello!</div>
+      <div class="gs">How can I help you?</div>
+    </div>
+    <div class="orbWrap">
+      <div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div>
+      <button id="orb" class="orb" aria-label="Bolo" title="Bolo">🎤</button>
+    </div>
+    <canvas id="wave" class="wave"></canvas>
+    <div id="vstatus" class="vstatus">Idle</div>
+    <button id="home_stop" class="g s" hidden>Stop speaking</button>
+    <div class="shortcuts">
+      <button class="card sc" data-go="chat">💬<span>Chat</span></button>
+      <button class="card sc" data-go="tasks">✅<span>Tasks</span></button>
+      <button class="card sc" data-go="notes">📝<span>Notes</span></button>
+      <button class="card sc" data-go="padhai">📚<span>Study</span></button>
+      <button class="card sc" data-go="phone">📱<span>Phone Controls</span></button>
+    </div>
+  </section>
+
   <!-- CHAT -->
-  <section id="s-chat" class="active">
+  <section id="s-chat">
     <div id="log"></div>
     <div class="bar">
       <button id="mic" class="g" title="Bolo">🎤</button>
@@ -82,6 +140,13 @@ h3{margin:6px 0}
       <button id="stop" class="d">Stop</button>
     </div>
     <input id="camFile" type="file" accept="image/*" capture="environment" hidden>
+  </section>
+
+  <!-- HISTORY (all saved chats) -->
+  <section id="s-history">
+    <input id="hSearch" type="search" placeholder="History mein search karo">
+    <div class="row"><button id="hExport" class="g s">History export</button><button id="hClear" class="d s">History delete</button></div>
+    <div id="hList"></div>
   </section>
 
   <!-- TASKS -->
@@ -171,6 +236,21 @@ h3{margin:6px 0}
   </section>
 </main>
 
+<div id="more" class="sheet" hidden>
+  <button class="g" data-go="tasks">✅ Tasks</button>
+  <button class="g" data-go="notes">📝 Notes</button>
+  <button class="g" data-go="memory">🧠 Memory</button>
+  <button class="g" data-go="padhai">📚 Padhai</button>
+  <button class="g" data-go="settings">⚙ Settings</button>
+  <button class="g" id="moreClose">Band karein</button>
+</div>
+<div class="bottom">
+  <button class="bn active" data-go="home">🏠<span>Home</span></button>
+  <button class="bn" data-go="history">🕘<span>History</span></button>
+  <button class="bn mic" id="bnMic" title="Bolo">🎤</button>
+  <button class="bn" id="bnMore">⋯<span>More</span></button>
+</div>
+
 <script>
 // ============ STORAGE (everything stays in this phone's browser) ============
 const KEY = 'sonic.v2';
@@ -181,7 +261,7 @@ const DEF = {
   accent: '#00e5ff', theme: 'dark',
   retries: 2, timeoutSec: 20, ctxLimit: 8, respLen: 'normal', memoryUse: true, offlineMode: false,
   privateMode: false, confirmDelete: true, queueOffline: true,
-  students: {}, current: '', history: [], tasks: [], notes: [], memories: [], lastLesson: []
+  students: {}, current: '', history: [], chatLog: [], tasks: [], notes: [], memories: [], lastLesson: []
 };
 const SETTING_KEYS = ['model', 'vmodel', 'lang', 'voice', 'rate', 'vol', 'cont', 'wake', 'bargeIn', 'accent', 'theme', 'privateMode', 'confirmDelete', 'queueOffline', 'retries', 'timeoutSec', 'ctxLimit', 'respLen', 'memoryUse', 'offlineMode'];
 let S = { ...DEF, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
@@ -209,8 +289,20 @@ function el(tag, props = {}, ...kids) {
 }
 function status(t) { $('#status').textContent = t; }
 function add(text, who) {
+  paint(text, who);
+  if (canStore()) {
+    S.chatLog.push({ who, text, at: nowIso() });
+    if (S.chatLog.length > 5000) S.chatLog = S.chatLog.slice(-5000);
+    save();
+  }
+}
+function paint(text, who) {
   $('#log').append(el('div', { class: 'm ' + (who === 'u' ? 'u' : 'j') }, text));
   $('#log').scrollTop = $('#log').scrollHeight;
+}
+function renderChat() {
+  $('#log').replaceChildren();
+  for (const x of S.chatLog.slice(-200)) paint(x.text, x.who);
 }
 function confirmDel(msg) { return !S.confirmDelete || confirm(msg); }
 // Private mode: nothing new is written to storage (history, notes, tasks, memory)
@@ -238,6 +330,7 @@ function voiceFor(text) {
   return all.find((x) => x.lang.toLowerCase().startsWith(want)) || null;
 }
 function sayWait(text, m = 'neutral') {
+  startStopWatcher();
   // Android app: use the phone's own Text-to-Speech (browser speech does not work in the app)
   if (window.JarvisNative && window.JarvisNative.speak) {
     return new Promise((resolve) => {
@@ -280,7 +373,20 @@ function sayWait(text, m = 'neutral') {
 const say = (text, m = 'neutral') => sayWait(text, m);
 
 // ============ SPEECH IN ============
-let activeRec = null, busy = false, halt = false, micOn = false, wantListen = false, loopOn = false;
+let activeRec = null, busy = false, halt = false, micOn = false, wantListen = false, loopOn = false, watcherOn = false;
+const STOP_RE = /\b(stop|ruko|chup|band karo)\b/i;
+// While SONIC speaks, listen for the word "stop" (Hindi or English) and stop the voice
+function startStopWatcher() {
+  if (watcherOn || !window.JarvisNative) return;
+  watcherOn = true;
+  (async () => {
+    while (speaking && !halt) {
+      const r = await recognizeOnce(S.lang, 3000, false);
+      if (r.text && STOP_RE.test(r.text)) { stopAll(); break; }
+    }
+    watcherOn = false;
+  })();
+}
 
 // One sentence from the child or user. Returns {text} or {err}. Retries once on "no-speech".
 function recognizeOnce(lang, ms, retry = true) {
@@ -344,7 +450,7 @@ async function loop() {
   if (loopOn) return;
   loopOn = true;
   while (wantListen) {
-    if (busy || speaking) { await sleep(250); continue; }
+    if (busy || speaking || watcherOn) { await sleep(250); continue; }
     const r = await recognizeOnce(S.lang, 9000);
     if (r.err === 'not-allowed' || r.err === 'service-not-allowed') {
       status('Mic permission nahi mili. Chrome mein mic Allow karein.');
@@ -369,7 +475,15 @@ async function handleVoice(text) {
     const m = text.match(WAKE_RE);
     if (!m) { status('Wake word bolein: "Hey SONIC"'); return; }
     text = text.slice(m.index + m[0].length).replace(/^[\s,.!?।]+/, '');
-    if (!text.trim()) { busy = true; try { await say('Ji boss, bolo.', 'happy'); } finally { busy = false; } return; }
+    if (!text.trim()) {
+      busy = true;
+      try {
+        await say('Ji boss, bolo.', 'happy');
+        const r = await recognizeOnce(S.lang, 9000);
+        if (r.text) await handleText(r.text);
+      } finally { busy = false; }
+      return;
+    }
   }
   await handleText(text);
 }
@@ -1101,7 +1215,126 @@ $('#mAdd').onclick = () => {
 $('#mExport').onclick = () => download('sonic-memory.json', JSON.stringify(S.memories, null, 2));
 $('#privToggle').onchange = (e) => { S.privateMode = e.target.checked; save(); $('#privSet').checked = S.privateMode; };
 
+// ============ HISTORY (all saved chats) ============
+function renderHistory() {
+  const q = $('#hSearch').value.toLowerCase();
+  const box = $('#hList');
+  box.replaceChildren();
+  const items = S.chatLog.filter((x) => x.text.toLowerCase().includes(q));
+  if (!items.length) box.append(el('p', { class: 'hint' }, 'Abhi koi history nahi hai.'));
+  let lastDay = '';
+  for (const x of items.slice().reverse()) {
+    const day = new Date(x.at).toLocaleDateString();
+    if (day !== lastDay) { box.append(el('h3', {}, day)); lastDay = day; }
+    box.append(el('div', { class: 'card' },
+      el('small', {}, (x.who === 'u' ? 'Aap' : 'SONIC') + ' · ' + new Date(x.at).toLocaleTimeString()),
+      el('div', {}, x.text)));
+  }
+}
+$('#hSearch').oninput = renderHistory;
+$('#hExport').onclick = () => download('sonic-history.json', JSON.stringify(S.chatLog, null, 2));
+$('#hClear').onclick = () => {
+  if (confirm('Sari chat history delete ho jayegi. Continue?')) {
+    S.chatLog = [];
+    save();
+    renderHistory();
+    renderChat();
+    status('History delete ho gayi');
+  }
+};
+
+// ============ HOME SCREEN (voice-first) ============
+let homeListening = false;
+const wave = $('#wave');
+const wctx = wave.getContext('2d');
+function sizeWave() {
+  const d = window.devicePixelRatio || 1;
+  const r = wave.getBoundingClientRect();
+  if (!r.width) return;
+  wave.width = r.width * d;
+  wave.height = r.height * d;
+  wctx.setTransform(d, 0, 0, d, 0, 0);
+}
+window.addEventListener('resize', sizeWave);
+function homeLabel() {
+  if (speaking) return 'Speaking...';
+  if (thinking || busy) return 'Processing...';
+  if (homeListening) return 'Listening...';
+  return 'Idle';
+}
+// The wave moves all the time. Its height changes with the state (idle, listening, processing, speaking).
+function drawWave(now) {
+  const w = wave.clientWidth, h = wave.clientHeight;
+  if (w && h) {
+    wctx.clearRect(0, 0, w, h);
+    const label = homeLabel();
+    if ($('#vstatus').textContent !== label) $('#vstatus').textContent = label;
+    $('#home_stop').hidden = !speaking;
+    $('#orb').classList.toggle('speak', speaking);
+    $('#orb').classList.toggle('on', homeListening && !speaking);
+    const amp = speaking ? 0.75 : (thinking || busy) ? 0.35 : homeListening ? 0.6 : 0.14;
+    const bars = 40, gap = 3, bw = (w - gap * (bars - 1)) / bars;
+    for (let i = 0; i < bars; i++) {
+      const ph = now / 180 + i * 0.35;
+      const v = (Math.sin(ph) + 1) / 2 * 0.6 + (Math.sin(ph * 2.3 + i) + 1) / 2 * 0.4;
+      const bh = Math.max(4, (amp * v + 0.06) * h);
+      const g = wctx.createLinearGradient(0, h / 2 - bh / 2, 0, h / 2 + bh / 2);
+      g.addColorStop(0, '#7c3aed');
+      g.addColorStop(0.5, S.accent);
+      g.addColorStop(1, '#7c3aed');
+      wctx.fillStyle = g;
+      wctx.fillRect(i * (bw + gap), h / 2 - bh / 2, bw, bh);
+    }
+  }
+  requestAnimationFrame(drawWave);
+}
+function showSection(t) {
+  if (t === 'phone') {
+    showSection('chat');
+    $('#txt').placeholder = 'flashlight on, volume 50, battery, alarm 7 baje...';
+    $('#txt').focus();
+    return;
+  }
+  $$('section').forEach((s) => s.classList.toggle('active', s.id === 's-' + t));
+  $$('.bn').forEach((b) => b.classList.toggle('active', b.dataset.go === t));
+  if (t === 'tasks') renderTasks();
+  if (t === 'notes') renderNotes();
+  if (t === 'memory') renderMemory();
+  if (t === 'padhai') renderPadhai();
+  if (t === 'settings') bindSettings();
+  if (t === 'history') renderHistory();
+  $('#more').hidden = true;
+}
+$$('[data-go]').forEach((b) => b.addEventListener('click', () => showSection(b.dataset.go)));
+$('#bnMore').onclick = () => { $('#more').hidden = !$('#more').hidden; };
+$('#moreClose').onclick = () => { $('#more').hidden = true; };
+$('#setBtn').onclick = () => showSection('settings');
+$('#bnMic').onclick = () => $('#orb').click();
+$('#home_stop').onclick = () => stopAll();
+$('#orb').onclick = async () => {
+  if (speaking) { stopAll(); return; }
+  if (busy || homeListening || watcherOn) return;
+  homeListening = true;
+  try {
+    const r = await recognizeOnce(S.lang, 9000);
+    if (r.text) await handleText(r.text);
+    else if (r.err && r.err !== 'no-speech') status('Mic: ' + r.err);
+  } finally {
+    homeListening = false;
+  }
+};
+function netUpdate() { $('#net').classList.toggle('off', !navigator.onLine); }
+window.addEventListener('online', netUpdate);
+window.addEventListener('offline', netUpdate);
+
 // ============ START ============
+if (!localStorage.getItem('sonic.wakeDefault')) { S.wake = true; save(); localStorage.setItem('sonic.wakeDefault', '1'); }
+sizeWave();
+requestAnimationFrame(drawWave);
+netUpdate();
+showSection('home');
+renderChat();
+if (window.JarvisNative) refreshListen();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 applyLook();
 paintToggles();
@@ -1115,8 +1348,8 @@ for (const t of S.tasks) {
 save();
 if (S.tasks.some((t) => t.status === 'queued')) flushQueue();
 status(navigator.onLine ? 'Ready' : 'Offline');
-add('Namaste boss! Main SONIC hoon. Mic dabao ya type karo.\nExamples: "main Riya hoon", "mujhe padhna hai", "teach: 1 se 5 ginti", "task: kal ka plan | shopping", "yaad rakho: mera naam Rahul hai", "flashlight on".', 'j');
-if (!S.keys.length) add('Shuru karne ke liye Settings mein Groq API key daalein.', 'j');
+if (!S.chatLog.length) add('Namaste boss! Main SONIC hoon. Mic dabao ya type karo.\nExamples: "main Riya hoon", "mujhe padhna hai", "teach: 1 se 5 ginti", "task: kal ka plan | shopping", "yaad rakho: mera naam Rahul hai", "flashlight on".', 'j');
+if (!S.keys.length) paint('Shuru karne ke liye Settings mein Groq API key daalein.', 'j');
 </script>
 </body>
 </html>
