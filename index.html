@@ -212,7 +212,7 @@ section{padding-bottom:96px}
       <select id="lang"><option value="hi-IN">Hindi / Hinglish</option><option value="en-IN">English (India)</option><option value="en-US">English (US)</option></select>
     </div>
     <div class="f">Voice profile
-      <select id="vprofile"><option value="auto">Auto (phone ki default awaaz)</option><option value="female">Female</option><option value="male">Male</option></select>
+      <select id="vprofile"><option value="auto">Auto (phone ki default awaaz)</option><option value="female">Female</option><option value="male">Male</option><option value="deep">Gehri awaaz</option><option value="bright">Patli awaaz</option></select>
       <div class="row"><button id="vTest" class="g s">Voice test</button></div>
     </div>
     <div class="f" hidden>Voice (phone par installed)<select id="voice"></select></div>
@@ -222,6 +222,7 @@ section{padding-bottom:96px}
     <label class="f c"><input id="contSet" type="checkbox"> Continuous conversation</label>
     <label class="f c"><input id="wakeSet" type="checkbox"> Wake word ("Hey SONIC" / "Hey Jarvis")</label>
     <label class="f c"><input id="bgWake" type="checkbox"> Background wake word (app band ho to bhi sunna; notification dikhegi)</label>
+    <div class="row" id="wakeHelp" hidden><button id="hBatt" class="g s">Battery: Unrestricted karein</button><button id="hNotif" class="g s">SONIC notification</button><button id="hFull" class="g s">Full-screen allow</button></div>
     <div class="row"><button id="micCheck" class="g s">Mic permission check</button><button id="notifBtn" class="g s">Notifications allow karein</button></div>
 
     <h3>Look</h3>
@@ -338,6 +339,7 @@ function sayWait(text, m = 'neutral') {
   startStopWatcher();
   // Android app: use the phone's own Text-to-Speech (browser speech does not work in the app)
   if (window.JarvisNative && window.JarvisNative.speak) {
+    if (Date.now() < bargeUntil) return Promise.resolve();
     return new Promise((resolve) => {
       speaking = true;
       mood = m;
@@ -378,11 +380,13 @@ function sayWait(text, m = 'neutral') {
 const say = (text, m = 'neutral') => sayWait(text, m);
 
 // ============ SPEECH IN ============
+let bargeUntil = 0;
 let activeRec = null, busy = false, halt = false, micOn = false, wantListen = false, loopOn = false, watcherOn = false;
 const STOP_RE = /\b(stop|ruko|chup|band karo)\b/i;
 // While SONIC speaks, listen for the word "stop" (Hindi or English) and stop the voice
 function startStopWatcher() {
   if (watcherOn || !window.JarvisNative) return;
+  if (window.JarvisNative.setBargeIn) return; // new app: native voice interruption is used instead
   watcherOn = true;
   (async () => {
     while (speaking && !halt) {
@@ -449,6 +453,20 @@ function recognizeOnce(lang, ms, retry = true) {
     try { r.start(); } catch { fin({ err: 'start' }); }
   });
 }
+
+// Android app: the user started talking while SONIC was speaking. The app already stopped the voice;
+// ignore the rest of the current reply so SONIC goes straight to listening.
+window.onNativeBargeIn = () => {
+  bargeUntil = Date.now() + 1500;
+  speaking = false; mood = 'neutral'; pulse = 0;
+  status('Sun raha hoon...');
+};
+// Android app: the user pressed "Band karo" in the SONIC notification
+window.onWakeServiceStopped = () => {
+  S.bgWake = false; save();
+  if ($('#bgWake')) $('#bgWake').checked = false;
+  status('Background wake word band kar diya');
+};
 
 // Keeps listening while the mic is on, or while continuous / wake word is on
 async function loop() {
@@ -1081,7 +1099,16 @@ function bindSettings() {
   $('#vol').value = S.vol;
   $('#vol').onchange = (e) => sv('vol', Number(e.target.value));
   $('#bargeIn').checked = S.bargeIn;
-  $('#bargeIn').onchange = (e) => sv('bargeIn', e.target.checked);
+  $('#bargeIn').onchange = (e) => {
+    sv('bargeIn', e.target.checked);
+    if (window.JarvisNative && window.JarvisNative.setBargeIn) window.JarvisNative.setBargeIn(e.target.checked);
+  };
+  if (window.JarvisNative && window.JarvisNative.run) {
+    $('#wakeHelp').hidden = false;
+    $('#hBatt').onclick = () => status(nativeCall({ action: 'openSettings', page: 'batteryOpt' }).message);
+    $('#hNotif').onclick = () => status(nativeCall({ action: 'openSettings', page: 'notifications' }).message);
+    $('#hFull').onclick = () => status(nativeCall({ action: 'openSettings', page: 'fullscreen' }).message);
+  }
   $('#contSet').checked = S.cont;
   $('#contSet').onchange = (e) => { sv('cont', e.target.checked); paintToggles(); refreshListen(); };
   $('#wakeSet').checked = S.wake;
@@ -1366,6 +1393,7 @@ netUpdate();
 showSection('home');
 renderChat();
 if (window.JarvisNative) refreshListen();
+if (window.JarvisNative && window.JarvisNative.setBargeIn) window.JarvisNative.setBargeIn(!!S.bargeIn);
 if (S.bgWake && window.JarvisNative && window.JarvisNative.setBackgroundWake) window.JarvisNative.setBackgroundWake(true);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 applyLook();
