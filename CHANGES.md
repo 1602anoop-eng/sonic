@@ -24,3 +24,9 @@ Pehla asli build GitHub Actions par hoga.
 - Background mic hamesha-on nahi: notification zaroori hai. Android 14+ par service sirf app khulne par shuru ho sakti hai
   aur phone restart ke baad apne aap shuru nahi hogi. Pehle app kholo, setting on karo.
 - Wake word English "Hey SONIC" hai. Uske baad ki baat Hindi/English/Hinglish chal sakti hai.
+
+## Update 2 (awaaz nahi aa rahi thi)
+- Agar phone mein Hindi voice na ho to ab English awaaz use hoti hai (pehle chupchap kuch nahi bolta tha).
+- Awaaz fail ho to app mein saaf message aata hai + Settings mein "Awaaz (Text-to-speech) settings" button.
+- Ek fixed signing key (android/app/debug.keystore) joda: ab naya APK purane ke upar install hoga (is key wale pehle build ke baad).
+  Ye sirf debug APK ki key hai, koi secret nahi.

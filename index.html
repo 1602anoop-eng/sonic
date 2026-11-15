@@ -222,7 +222,7 @@ section{padding-bottom:96px}
     <label class="f c"><input id="contSet" type="checkbox"> Continuous conversation</label>
     <label class="f c"><input id="wakeSet" type="checkbox"> Wake word ("Hey SONIC" / "Hey Jarvis")</label>
     <label class="f c"><input id="bgWake" type="checkbox"> Background wake word (app band ho to bhi sunna; notification dikhegi)</label>
-    <div class="row" id="wakeHelp" hidden><button id="hBatt" class="g s">Battery: Unrestricted karein</button><button id="hNotif" class="g s">SONIC notification</button><button id="hFull" class="g s">Full-screen allow</button></div>
+    <div class="row" id="wakeHelp" hidden><button id="hBatt" class="g s">Battery: Unrestricted karein</button><button id="hNotif" class="g s">SONIC notification</button><button id="hFull" class="g s">Full-screen allow</button><button id="hTts" class="g s">Awaaz (Text-to-speech) settings</button></div>
     <div class="row"><button id="micCheck" class="g s">Mic permission check</button><button id="notifBtn" class="g s">Notifications allow karein</button></div>
 
     <h3>Look</h3>
@@ -460,6 +460,14 @@ window.onNativeBargeIn = () => {
   bargeUntil = Date.now() + 1500;
   speaking = false; mood = 'neutral'; pulse = 0;
   status('Sun raha hoon...');
+};
+// Android app: the phone's own voice (Text-to-speech) has a problem
+window.onNativeTtsError = (code) => {
+  const msg = code === 'lang'
+    ? 'Is phone mein Hindi awaaz nahi hai, English awaaz use ho rahi hai. Settings mein "Awaaz (Text-to-speech) settings" se Hindi voice install karein.'
+    : 'Phone ki awaaz (Text-to-speech) nahi chal rahi. Settings mein "Awaaz (Text-to-speech) settings" kholkar Google ya Samsung ki voice engine chunein aur Hindi/English voice download karein.';
+  status(msg);
+  add(msg, 'j');
 };
 // Android app: the user pressed "Band karo" in the SONIC notification
 window.onWakeServiceStopped = () => {
@@ -1107,6 +1115,7 @@ function bindSettings() {
     $('#wakeHelp').hidden = false;
     $('#hBatt').onclick = () => status(nativeCall({ action: 'openSettings', page: 'batteryOpt' }).message);
     $('#hNotif').onclick = () => status(nativeCall({ action: 'openSettings', page: 'notifications' }).message);
+    $('#hTts').onclick = () => status(nativeCall({ action: 'openSettings', page: 'tts' }).message);
     $('#hFull').onclick = () => status(nativeCall({ action: 'openSettings', page: 'fullscreen' }).message);
   }
   $('#contSet').checked = S.cont;
