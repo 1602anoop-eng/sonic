@@ -267,6 +267,31 @@ let activeRec = null, busy = false, halt = false, micOn = false, wantListen = fa
 
 // One sentence from the child or user. Returns {text} or {err}. Retries once on "no-speech".
 function recognizeOnce(lang, ms, retry = true) {
+  // Android app: use the phone's own speech recognizer (the WebView browser one does not work)
+  if (window.JarvisNative && window.JarvisNative.startListening) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (v) => {
+        if (done) return;
+        done = true;
+        window.onNativeSpeech = null;
+        window.onNativeSpeechError = null;
+        listening = false;
+        if (!speaking && !thinking) mood = 'neutral';
+        resolve(v);
+      };
+      window.onNativeSpeech = (text) => finish({ text: text || null });
+      window.onNativeSpeechError = (code) => finish({ err: code });
+      listening = true; mood = 'focused'; status('Sun raha hoon...');
+      try { window.JarvisNative.startListening(lang); } catch { finish({ err: 'start' }); return; }
+      setTimeout(() => {
+        if (done) return;
+        try { window.JarvisNative.stopListening(); } catch { /* not running */ }
+        finish({ text: null });
+      }, ms);
+    });
+  }
+
   return new Promise((resolve) => {
     const R = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!R) { resolve({ err: 'unsupported' }); return; }
