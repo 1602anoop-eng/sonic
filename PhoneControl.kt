@@ -1,5 +1,6 @@
 package com.sonic.app
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.hardware.camera2.CameraCharacteristics
@@ -21,6 +22,7 @@ object PhoneControl {
         when (req.optString("action")) {
             "flashlight" -> flashlight(ctx, req.optBoolean("on", true))
             "volume" -> volume(ctx, req.optInt("level", 50))
+            "brightness" -> brightness(ctx, req.optInt("level", 50))
             "alarm" -> alarm(ctx, req.optInt("hour", -1), req.optInt("minute", 0), req.optString("label", "SONIC"))
             "timer" -> timer(ctx, req.optInt("seconds", 0), req.optString("label", "SONIC"))
             "openApp" -> openApp(ctx, req.optString("pkg"))
@@ -50,6 +52,19 @@ object PhoneControl {
         val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         am.setStreamVolume(AudioManager.STREAM_MUSIC, pct * max / 100, AudioManager.FLAG_SHOW_UI)
         return ok("Volume $pct% par set")
+    }
+
+    // Screen brightness for the SONIC app window only (Android does not allow changing the whole phone without special permission)
+    private fun brightness(ctx: Context, level: Int): JSONObject {
+        val act = ctx as? Activity ?: return fail("Brightness is screen par nahi badal sakte")
+        val pct = level.coerceIn(0, 100)
+        val value = if (pct < 5) 0.05f else pct / 100f
+        act.runOnUiThread {
+            val lp = act.window.attributes
+            lp.screenBrightness = value
+            act.window.attributes = lp
+        }
+        return ok("Brightness $pct% par set (sirf SONIC app mein)")
     }
 
     private fun alarm(ctx: Context, hour: Int, minute: Int, label: String): JSONObject {

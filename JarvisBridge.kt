@@ -99,7 +99,7 @@ class JarvisBridge(private val ctx: Context, private val web: WebView) {
 
     // Speaks the text with Android's own Text-to-Speech. The web page waits for onNativeSpeakDone().
     @JavascriptInterface
-    fun speak(text: String, lang: String, rate: Double) {
+    fun speak(text: String, lang: String, rate: Double, profile: String) {
         main.post {
             val engine = tts
             if (engine == null || !ttsReady) {
@@ -107,12 +107,17 @@ class JarvisBridge(private val ctx: Context, private val web: WebView) {
                 return@post
             }
             engine.language = toLocale(lang)
-            // Prefer a female voice if the phone has one for this language
+            // Voice profile: female or male voice if the phone has one for this language; auto = phone default
             val want = toLocale(lang)
-            val female = engine.voices?.firstOrNull {
-                it.locale.language == want.language && it.name.contains("female", ignoreCase = true)
+            val pick = engine.voices?.firstOrNull {
+                val n = it.name.lowercase()
+                it.locale.language == want.language && when (profile) {
+                    "female" -> n.contains("female")
+                    "male" -> n.contains("male") && !n.contains("female")
+                    else -> false
+                }
             }
-            if (female != null) engine.voice = female
+            if (pick != null) engine.voice = pick else engine.language = want
             engine.setSpeechRate(rate.toFloat().coerceIn(0.5f, 1.5f))
             engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}
