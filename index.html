@@ -743,13 +743,34 @@ $('#mImport').onchange = async (e) => {
 
 // ============ STUDENTS AND TEACHING ============
 const BANK = [
-  { topic: 'A se E (alphabets)', items: [
+  { topic: 'English: A se E', items: [
     { w: 'A', ok: ['a', 'ay', 'ए'] }, { w: 'B', ok: ['b', 'bee', 'बी'] }, { w: 'C', ok: ['c', 'see', 'सी'] },
     { w: 'D', ok: ['d', 'dee', 'डी'] }, { w: 'E', ok: ['e', 'ee', 'ई'] } ] },
+  { topic: 'English: F se J', items: [
+    { w: 'F', ok: ['f', 'ef', 'एफ'] }, { w: 'G', ok: ['g', 'gee', 'जी'] }, { w: 'H', ok: ['h', 'aitch', 'एच'] },
+    { w: 'I', ok: ['i', 'eye', 'आई'] }, { w: 'J', ok: ['j', 'jay', 'जे'] } ] },
+  { topic: 'English: K se O', items: [
+    { w: 'K', ok: ['k', 'kay', 'के'] }, { w: 'L', ok: ['l', 'el', 'एल'] }, { w: 'M', ok: ['m', 'em', 'एम'] },
+    { w: 'N', ok: ['n', 'en', 'एन'] }, { w: 'O', ok: ['o', 'oh', 'ओ'] } ] },
+  { topic: 'English: Animals (Apple, Ball, Cat)', items: [
+    { w: 'Apple', ok: ['apple', 'एप्पल', 'सेब'] }, { w: 'Ball', ok: ['ball', 'बॉल', 'गेंद'] },
+    { w: 'Cat', ok: ['cat', 'कैट', 'बिल्ली'] }, { w: 'Dog', ok: ['dog', 'डॉग', 'कुत्ता'] } ] },
+  { topic: 'Hindi swar (अ, आ, इ, ई)', items: [
+    { w: 'अ', ok: ['a', 'अ'] }, { w: 'आ', ok: ['aa', 'aa', 'आ'] },
+    { w: 'इ', ok: ['i', 'इ'] }, { w: 'ई', ok: ['ee', 'ii', 'ई'] } ] },
+  { topic: 'Hindi vyanjan (क, ख, ग)', items: [
+    { w: 'क', ok: ['ka', 'क'] }, { w: 'ख', ok: ['kha', 'ख'] }, { w: 'ग', ok: ['ga', 'ग'] } ] },
   { topic: 'Ginti 1 se 5', items: [
     { w: 'Ek', ok: ['ek', '1', 'one', 'एक'] }, { w: 'Do', ok: ['do', '2', 'two', 'दो'] },
     { w: 'Teen', ok: ['teen', '3', 'three', 'तीन'] }, { w: 'Chaar', ok: ['chaar', 'char', '4', 'four', 'चार'] },
     { w: 'Paanch', ok: ['paanch', 'panch', '5', 'five', 'पांच', 'पाँच'] } ] },
+  { topic: 'Ginti 6 se 10', items: [
+    { w: 'Chhe', ok: ['chhe', 'che', '6', 'six', 'छह'] }, { w: 'Saat', ok: ['saat', '7', 'seven', 'सात'] },
+    { w: 'Aath', ok: ['aath', '8', 'eight', 'आठ'] }, { w: 'Nau', ok: ['nau', '9', 'nine', 'नौ'] },
+    { w: 'Das', ok: ['das', '10', 'ten', 'दस'] } ] },
+  { topic: 'Math: Jod (1 + 1)', items: [
+    { w: 'Ek plus ek', ok: ['2', 'do', 'two', 'दो'] }, { w: 'Do plus do', ok: ['4', 'chaar', 'four', 'चार'] },
+    { w: 'Teen plus do', ok: ['5', 'paanch', 'five', 'पांच', 'पाँच'] } ] },
   { topic: 'Rang (colours)', items: [
     { w: 'Lal', ok: ['lal', 'laal', 'red', 'लाल'] }, { w: 'Neela', ok: ['neela', 'blue', 'नीला'] },
     { w: 'Hara', ok: ['hara', 'green', 'हरा'] }, { w: 'Peela', ok: ['peela', 'yellow', 'पीला'] } ] },
