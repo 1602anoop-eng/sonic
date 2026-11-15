@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -50,8 +51,9 @@ class MainActivity : AppCompatActivity() {
                 return request.url.host != APP_HOST
             }
 
-            // If the app was opened by "Hey SONIC" from the background, pass the words to the page once it is ready
+            // If SONIC was opened by "Hey SONIC" in the background, pass the words to the page once it is ready
             override fun onPageFinished(view: WebView?, url: String?) {
+                pageLoadedOnce = true
                 pendingWake?.let { deliverWake(it) }
                 pendingWake = null
             }
@@ -71,21 +73,44 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 33) perms.add(Manifest.permission.POST_NOTIFICATIONS)
         askPermissions.launch(perms.toTypedArray())
 
-        intent?.getStringExtra(VoiceService.EXTRA_WAKE_TEXT)?.let { pendingWake = it }
+        handleWakeIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.getStringExtra(VoiceService.EXTRA_WAKE_TEXT)?.let { deliverWake(it) }
+        handleWakeIntent(intent)
+    }
+
+    // Wake from "Hey SONIC": show the screen over the lock screen (unlock is still needed) and pass the words on
+    private fun handleWakeIntent(i: Intent?) {
+        val text = i?.getStringExtra(VoiceService.EXTRA_WAKE_TEXT) ?: return
+        showOverLockScreen(true)
+        if (::web.isInitialized && pageLoadedOnce) deliverWake(text) else pendingWake = text
+    }
+
+    private var pageLoadedOnce = false
+
+    private fun showOverLockScreen(on: Boolean) {
+        if (Build.VERSION.SDK_INT >= 27) {
+            setShowWhenLocked(on)
+            setTurnScreenOn(on)
+        } else if (on) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
+        }
     }
 
     override fun onStart() {
         super.onStart()
         VoiceService.appVisible = true
+        VoiceService.instance?.pauseDetection()
     }
 
     override fun onStop() {
         VoiceService.appVisible = false
+        VoiceService.instance?.resumeDetection()
+        showOverLockScreen(false)
         super.onStop()
     }
 
